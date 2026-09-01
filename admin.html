@@ -122,6 +122,11 @@
         <span>Live Auto-Update (har 2.5 sec)</span>
       </div>
 
+      <div class="live-row">
+        <input type="checkbox" id="spotInput">
+        <span>Show "World Live Gold Price (oz)" button to users</span>
+      </div>
+
       <hr class="divider">
       <button onclick="saveAll()">Save All Settings</button>
       <div class="status-msg" id="saveMsg"></div>
@@ -137,7 +142,8 @@
     rate: 'gc_admin_tola_rate',
     masha: 'gc_admin_masha',
     vol: 'gc_admin_volatility',
-    live: 'gc_admin_live'
+    live: 'gc_admin_live',
+    spot: 'gc_admin_show_spot'
   };
   const ADMIN_PASS_KEY = 'gc_admin_pass';
   const DEFAULT_TOLA_RATE = 450000;
@@ -180,6 +186,9 @@
 
     const live = localStorage.getItem(KEYS.live);
     document.getElementById('liveInput').checked = (live === null) ? true : (live === '1');
+
+    const spot = localStorage.getItem(KEYS.spot);
+    document.getElementById('spotInput').checked = (spot === '1');
   }
 
   function saveAll(){
@@ -187,6 +196,7 @@
     const masha = parseFloat(document.getElementById('mashaInput').value);
     const vol = document.getElementById('volInput').value;
     const live = document.getElementById('liveInput').checked;
+    const spot = document.getElementById('spotInput').checked;
     const msg = document.getElementById('saveMsg');
 
     if(!isFinite(rate) || rate <= 0){
@@ -204,6 +214,7 @@
     localStorage.setItem(KEYS.masha, masha);
     localStorage.setItem(KEYS.vol, vol);
     localStorage.setItem(KEYS.live, live ? '1' : '0');
+    localStorage.setItem(KEYS.spot, spot ? '1' : '0');
 
     document.getElementById('currentRateDisp').textContent = fmt(rate);
     msg.textContent = 'Settings save ho gayi — Live Board update ho jayega.';

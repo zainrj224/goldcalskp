@@ -167,6 +167,23 @@
     .home-branch-card .hb-rate-val{font-size:26px;}
   }
 
+  /* ---- world gold price (admin-toggleable) ---- */
+  .world-gold-wrap{max-width:1200px;margin:0 auto 18px auto;}
+  .world-gold-btn{
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    width:100%;background:var(--card);border:1px dashed var(--gold);
+    color:var(--gold-bright);font-size:14px;font-weight:700;
+    border-radius:10px;padding:12px;cursor:pointer;transition:background .15s;
+  }
+  .world-gold-btn:hover{background:var(--card2);}
+  .world-gold-panel{
+    margin-top:10px;background:var(--card);border:1px solid var(--border);
+    border-radius:10px;padding:16px 20px;display:flex;flex-wrap:wrap;gap:18px;
+  }
+  .wg-row{display:flex;flex-direction:column;gap:2px;min-width:120px;}
+  .wg-row span{font-size:11px;color:var(--muted);}
+  .wg-row b{font-size:16px;color:var(--gold-bright);}
+
   /* ---- ticker ---- */
   .ticker-wrap{
     max-width:1200px;margin:0 auto 18px auto;
@@ -475,6 +492,15 @@
   </div>
 </div>
 
+<div class="world-gold-wrap" id="worldGoldWrap" style="display:none;">
+  <button class="world-gold-btn" id="worldGoldBtn" onclick="toggleWorldGold()">🌍 Show World Live Gold Price (per Oz)</button>
+  <div class="world-gold-panel" id="worldGoldPanel" style="display:none;">
+    <div class="wg-row"><span>Symbol</span><b>XAU / USD</b></div>
+    <div class="wg-row"><span>Price</span><b id="wgPrice">Loading…</b></div>
+    <div class="wg-row"><span>Last Updated</span><b id="wgUpdated">--</b></div>
+  </div>
+</div>
+
 <div class="ticker-wrap">
   <div class="ticker" id="tickerRow"></div>
 </div>
@@ -731,6 +757,43 @@ function updateHomeBranch(){
   if(el) el.textContent = val > 0 ? fmt(val) : '--';
 }
 
+// ---- World Gold Price (free, no-key, CORS-enabled API: gold-api.com) ----
+let worldGoldTimer = null;
+async function fetchWorldGold(){
+  const priceEl = document.getElementById('wgPrice');
+  const updEl = document.getElementById('wgUpdated');
+  try{
+    const res = await fetch('https://api.gold-api.com/price/XAU');
+    if(!res.ok) throw new Error('bad response');
+    const data = await res.json();
+    priceEl.textContent = '$' + Number(data.price).toLocaleString('en-US', {maximumFractionDigits:2}) + ' / oz';
+    updEl.textContent = data.updatedAtReadable || 'Just now';
+  }catch(err){
+    priceEl.textContent = 'Unavailable';
+    updEl.textContent = '--';
+  }
+}
+function toggleWorldGold(){
+  const panel = document.getElementById('worldGoldPanel');
+  const showing = panel.style.display !== 'none';
+  if(showing){
+    panel.style.display = 'none';
+    if(worldGoldTimer){ clearInterval(worldGoldTimer); worldGoldTimer = null; }
+  } else {
+    panel.style.display = 'flex';
+    fetchWorldGold();
+    worldGoldTimer = setInterval(fetchWorldGold, 30000);
+  }
+}
+function applyWorldGoldToggle(){
+  const on = localStorage.getItem('gc_admin_show_spot') === '1';
+  document.getElementById('worldGoldWrap').style.display = on ? 'block' : 'none';
+  if(!on){
+    document.getElementById('worldGoldPanel').style.display = 'none';
+    if(worldGoldTimer){ clearInterval(worldGoldTimer); worldGoldTimer = null; }
+  }
+}
+
 function rebuild(){
   prevState = {...cityState};
   computeCityRates();
@@ -751,6 +814,7 @@ function applyVolatility(){
   });
   renderCards();
   buildTicker();
+  updateHomeBranch();
 }
 
 function restartLive(){
@@ -812,6 +876,9 @@ window.addEventListener('storage', function(e){
     rebuild();
     restartLive();
   }
+  if(e.key === 'gc_admin_show_spot'){
+    applyWorldGoldToggle();
+  }
 });
 
 // init
@@ -824,6 +891,7 @@ buildTicker();
 updateCalculator();
 updateBill();
 updateHomeBranch();
+applyWorldGoldToggle();
 restartLive();
 tickClock();
 setInterval(tickClock, 1000);
