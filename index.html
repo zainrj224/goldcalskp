@@ -813,7 +813,7 @@ function toggleWorldGold(){
   }
 }
 function applyWorldGoldToggle(){
-  const on = localStorage.getItem('gc_admin_show_spot') === '1';
+  const on = !!(latestAdminSettings && latestAdminSettings.spot);
   document.getElementById('worldGoldWrap').style.display = on ? 'block' : 'none';
   if(!on){
     document.getElementById('worldGoldPanel').style.display = 'none';
@@ -870,58 +870,82 @@ function toggleTheme(){
   applyTheme(current === 'dark' ? 'light' : 'dark');
 }
 
-// Admin-controlled settings (shared keys with admin.html)
-const ADMIN_KEYS = {
-  rate:  'gc_admin_tola_rate',
-  masha: 'gc_admin_masha',
-  vol:   'gc_admin_volatility',
-  live:  'gc_admin_live'
-};
+// Admin-controlled settings (fetched from shared /.netlify/functions/rate endpoint)
+const RATE_API = '/.netlify/functions/rate';
 const DEFAULT_TOLA_RATE = 450000;
 const DEFAULT_MASHA = 2;
 const DEFAULT_VOL = '200';
 const DEFAULT_LIVE = '1';
 
-function loadAdminSettings(){
-  const savedRate = parseFloat(localStorage.getItem(ADMIN_KEYS.rate));
-  const rate = (isFinite(savedRate) && savedRate > 0) ? savedRate : DEFAULT_TOLA_RATE;
+let latestAdminSettings = null; // last settings object fetched from the server
+
+function applyAdminSettings(settings){
+  const rate = (settings && isFinite(settings.rate) && settings.rate > 0) ? settings.rate : DEFAULT_TOLA_RATE;
   document.getElementById('baseTola').value = rate;
 
-  const savedMasha = parseFloat(localStorage.getItem(ADMIN_KEYS.masha));
-  document.getElementById('mashaMaking').value = (isFinite(savedMasha) && savedMasha >= 0) ? savedMasha : DEFAULT_MASHA;
+  const masha = (settings && isFinite(settings.masha) && settings.masha >= 0) ? settings.masha : DEFAULT_MASHA;
+  document.getElementById('mashaMaking').value = masha;
 
-  document.getElementById('volatility').value = localStorage.getItem(ADMIN_KEYS.vol) || DEFAULT_VOL;
+  document.getElementById('volatility').value = (settings && settings.vol != null) ? settings.vol : DEFAULT_VOL;
 
-  const live = localStorage.getItem(ADMIN_KEYS.live);
-  document.getElementById('liveToggle').checked = (live === null) ? (DEFAULT_LIVE === '1') : (live === '1');
+  const live = settings ? settings.live : null;
+  document.getElementById('liveToggle').checked = (live === null || live === undefined) ? (DEFAULT_LIVE === '1') : !!live;
 }
 
-// keep in sync if admin updates settings in another tab/window
-window.addEventListener('storage', function(e){
-  if(Object.values(ADMIN_KEYS).includes(e.key)){
-    loadAdminSettings();
-    rebuild();
-    restartLive();
+async function loadAdminSettings(){
+  try {
+    const res = await fetch(RATE_API, { cache: 'no-store' });
+    if(res.ok){
+      const settings = await res.json();
+      latestAdminSettings = settings;
+      applyAdminSettings(settings);
+      return settings;
+    }
+  } catch(err){
+    // network error — keep whatever settings/defaults are currently applied
   }
-  if(e.key === 'gc_admin_show_spot'){
-    applyWorldGoldToggle();
+  if(!latestAdminSettings){
+    applyAdminSettings(null);
   }
-});
+  return latestAdminSettings;
+}
+
+// poll the shared endpoint so all visitors pick up admin changes live
+async function pollAdminSettings(){
+  try {
+    const res = await fetch(RATE_API, { cache: 'no-store' });
+    if(!res.ok) return;
+    const settings = await res.json();
+    const changed = !latestAdminSettings || settings.updatedAt !== latestAdminSettings.updatedAt;
+    if(changed){
+      latestAdminSettings = settings;
+      applyAdminSettings(settings);
+      rebuild();
+      restartLive();
+      applyWorldGoldToggle();
+    }
+  } catch(err){
+    // network error — try again on the next poll
+  }
+}
+setInterval(pollAdminSettings, 10000);
 
 // init
 applyTheme('light');
 buildCards();
-loadAdminSettings();
-computeCityRates();
-renderCards();
-buildTicker();
-updateCalculator();
-updateBill();
-updateHomeBranch();
-applyWorldGoldToggle();
-restartLive();
-tickClock();
-setInterval(tickClock, 1000);
+(async function init(){
+  await loadAdminSettings();
+  computeCityRates();
+  renderCards();
+  buildTicker();
+  updateCalculator();
+  updateBill();
+  updateHomeBranch();
+  applyWorldGoldToggle();
+  restartLive();
+  tickClock();
+  setInterval(tickClock, 1000);
+})();
 </script>
 
 </body>

@@ -138,19 +138,15 @@
 </div>
 
 <script>
-  const KEYS = {
-    rate: 'gc_admin_tola_rate',
-    masha: 'gc_admin_masha',
-    vol: 'gc_admin_volatility',
-    live: 'gc_admin_live',
-    spot: 'gc_admin_show_spot'
-  };
+  const RATE_API = '/.netlify/functions/rate';
   const ADMIN_PASS_KEY = 'gc_admin_pass';
   const DEFAULT_TOLA_RATE = 450000;
   const DEFAULT_MASHA = 2;
   const DEFAULT_VOL = '200';
   const DEFAULT_LIVE = '1';
   const DEFAULT_PASS = 'admin123'; // change this after first login
+
+  let enteredPass = null; // passcode entered at login, sent as x-admin-pass on save
 
   function fmt(n){ return n.toLocaleString('en-PK', {maximumFractionDigits:0}); }
 
@@ -162,7 +158,9 @@
     const entered = document.getElementById('passInput').value;
     const msg = document.getElementById('loginMsg');
     if(entered === getStoredPass()){
+      enteredPass = entered;
       sessionStorage.setItem('gc_admin_ok', '1');
+      sessionStorage.setItem('gc_admin_entered_pass', entered);
       showRateCard();
     } else {
       msg.textContent = 'Galat passcode. Dobara koshish karein.';
@@ -170,28 +168,45 @@
     }
   }
 
-  function showRateCard(){
+  function backToLogin(){
+    sessionStorage.removeItem('gc_admin_ok');
+    sessionStorage.removeItem('gc_admin_entered_pass');
+    enteredPass = null;
+    document.getElementById('rateCard').style.display = 'none';
+    document.getElementById('loginCard').style.display = 'block';
+  }
+
+  async function showRateCard(){
     document.getElementById('loginCard').style.display = 'none';
     document.getElementById('rateCard').style.display = 'block';
 
-    const savedRate = parseFloat(localStorage.getItem(KEYS.rate));
-    const rate = (isFinite(savedRate) && savedRate > 0) ? savedRate : DEFAULT_TOLA_RATE;
+    let settings = null;
+    try {
+      const res = await fetch(RATE_API);
+      if(res.ok){
+        settings = await res.json();
+      }
+    } catch(err){
+      // network/fetch failure — fall back to defaults below
+    }
+
+    const rate = (settings && isFinite(settings.rate) && settings.rate > 0) ? settings.rate : DEFAULT_TOLA_RATE;
     document.getElementById('currentRateDisp').textContent = fmt(rate);
     document.getElementById('rateInput').value = rate;
 
-    const savedMasha = parseFloat(localStorage.getItem(KEYS.masha));
-    document.getElementById('mashaInput').value = (isFinite(savedMasha) && savedMasha >= 0) ? savedMasha : DEFAULT_MASHA;
+    const masha = (settings && isFinite(settings.masha) && settings.masha >= 0) ? settings.masha : DEFAULT_MASHA;
+    document.getElementById('mashaInput').value = masha;
 
-    document.getElementById('volInput').value = localStorage.getItem(KEYS.vol) || DEFAULT_VOL;
+    document.getElementById('volInput').value = (settings && settings.vol != null) ? settings.vol : DEFAULT_VOL;
 
-    const live = localStorage.getItem(KEYS.live);
-    document.getElementById('liveInput').checked = (live === null) ? true : (live === '1');
+    const live = settings ? settings.live : null;
+    document.getElementById('liveInput').checked = (live === null || live === undefined) ? true : !!live;
 
-    const spot = localStorage.getItem(KEYS.spot);
-    document.getElementById('spotInput').checked = (spot === '1');
+    const spot = settings ? settings.spot : null;
+    document.getElementById('spotInput').checked = !!spot;
   }
 
-  function saveAll(){
+  async function saveAll(){
     const rate = parseFloat(document.getElementById('rateInput').value);
     const masha = parseFloat(document.getElementById('mashaInput').value);
     const vol = document.getElementById('volInput').value;
@@ -210,19 +225,43 @@
       return;
     }
 
-    localStorage.setItem(KEYS.rate, rate);
-    localStorage.setItem(KEYS.masha, masha);
-    localStorage.setItem(KEYS.vol, vol);
-    localStorage.setItem(KEYS.live, live ? '1' : '0');
-    localStorage.setItem(KEYS.spot, spot ? '1' : '0');
+    const pass = enteredPass || sessionStorage.getItem('gc_admin_entered_pass') || '';
 
-    document.getElementById('currentRateDisp').textContent = fmt(rate);
-    msg.textContent = 'Settings save ho gayi — Live Board update ho jayega.';
-    msg.className = 'status-msg ok';
+    try {
+      const res = await fetch(RATE_API, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-pass': pass
+        },
+        body: JSON.stringify({ rate, masha, vol, live, spot })
+      });
+
+      if(res.status === 401){
+        msg.textContent = 'Session expired ya galat passcode — dobara login karein.';
+        msg.className = 'status-msg err';
+        backToLogin();
+        return;
+      }
+
+      if(!res.ok){
+        msg.textContent = 'Save nahi ho saka — dobara koshish karein.';
+        msg.className = 'status-msg err';
+        return;
+      }
+
+      document.getElementById('currentRateDisp').textContent = fmt(rate);
+      msg.textContent = 'Settings save ho gayi — Live Board update ho jayega.';
+      msg.className = 'status-msg ok';
+    } catch(err){
+      msg.textContent = 'Network error — save nahi ho saka.';
+      msg.className = 'status-msg err';
+    }
   }
 
   // auto-login if already logged in this session
   if(sessionStorage.getItem('gc_admin_ok') === '1'){
+    enteredPass = sessionStorage.getItem('gc_admin_entered_pass') || null;
     showRateCard();
   }
 </script>
