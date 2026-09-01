@@ -495,8 +495,9 @@
 <div class="world-gold-wrap" id="worldGoldWrap" style="display:none;">
   <button class="world-gold-btn" id="worldGoldBtn" onclick="toggleWorldGold()">🌍 Show World Live Gold Price (per Oz)</button>
   <div class="world-gold-panel" id="worldGoldPanel" style="display:none;">
-    <div class="wg-row"><span>Symbol</span><b>XAU / USD</b></div>
-    <div class="wg-row"><span>Price</span><b id="wgPrice">Loading…</b></div>
+    <div class="wg-row"><span>Symbol</span><b>XAU / PKR</b></div>
+    <div class="wg-row"><span>Price (per Oz)</span><b id="wgPricePKR">Loading…</b></div>
+    <div class="wg-row"><span>USD Reference</span><b id="wgPriceUSD">--</b></div>
     <div class="wg-row"><span>Last Updated</span><b id="wgUpdated">--</b></div>
   </div>
 </div>
@@ -534,7 +535,7 @@
   <div class="bill-inputs">
     <div class="box">
       <label for="billTolaRate">1 Tola Price (PKR)</label>
-      <input type="number" id="billTolaRate" placeholder="e.g. 450000" oninput="updateBill()">
+      <input type="number" id="billTolaRate" value="0" placeholder="e.g. 450000" oninput="updateBill()">
       <small>Current tola rate jo aap ne upar set kiya (ya alag se yahan daal sakte hain)</small>
     </div>
     <div class="box">
@@ -730,10 +731,6 @@ function updateCalculator(){
 
 function updateBill(){
   const billTolaInput = document.getElementById('billTolaRate');
-  // if user hasn't typed their own tola price yet, keep it synced to master base rate
-  if(!billTolaInput.dataset.touched || billTolaInput.value === ''){
-    billTolaInput.value = getBase() > 0 ? getBase() : '';
-  }
   const pT = parseFloat(billTolaInput.value) || 0;
   const M = parseFloat(document.getElementById('billMakingGrams').value) || 0;
   const P = parseFloat(document.getElementById('billProductWeight').value) || 0;
@@ -749,7 +746,7 @@ function updateBill(){
   document.getElementById('billMakingCost').textContent = makingCost>0 ? fmt2(makingCost) + ' PKR' : '--';
   document.getElementById('billTotal').textContent = total>0 ? fmt2(total) + ' PKR' : '--';
 }
-document.getElementById('billTolaRate').addEventListener('input', function(){ this.dataset.touched = '1'; });
+
 
 function updateHomeBranch(){
   const val = cityState['Sheikhupura'] || 0;
@@ -758,18 +755,48 @@ function updateHomeBranch(){
 }
 
 // ---- World Gold Price (free, no-key, CORS-enabled API: gold-api.com) ----
+// Auto-converted to PKR using a free, no-key exchange-rate API (open.er-api.com)
 let worldGoldTimer = null;
+let cachedUsdToPkr = null;      // cached rate so we don't hammer the FX API every 30s
+let cachedRateFetchedAt = 0;
+
+async function getUsdToPkrRate(){
+  const ONE_HOUR = 60 * 60 * 1000;
+  if(cachedUsdToPkr && (Date.now() - cachedRateFetchedAt) < ONE_HOUR){
+    return cachedUsdToPkr;
+  }
+  const res = await fetch('https://open.er-api.com/v6/latest/USD');
+  if(!res.ok) throw new Error('fx rate fetch failed');
+  const data = await res.json();
+  const rate = data && data.rates && data.rates.PKR;
+  if(!isFinite(rate) || rate <= 0) throw new Error('no PKR rate in response');
+  cachedUsdToPkr = rate;
+  cachedRateFetchedAt = Date.now();
+  return rate;
+}
+
 async function fetchWorldGold(){
-  const priceEl = document.getElementById('wgPrice');
+  const pkrEl = document.getElementById('wgPricePKR');
+  const usdEl = document.getElementById('wgPriceUSD');
   const updEl = document.getElementById('wgUpdated');
   try{
     const res = await fetch('https://api.gold-api.com/price/XAU');
     if(!res.ok) throw new Error('bad response');
     const data = await res.json();
-    priceEl.textContent = '$' + Number(data.price).toLocaleString('en-US', {maximumFractionDigits:2}) + ' / oz';
+    const usdPrice = Number(data.price);
+    usdEl.textContent = '$' + usdPrice.toLocaleString('en-US', {maximumFractionDigits:2}) + ' / oz';
     updEl.textContent = data.updatedAtReadable || 'Just now';
+
+    try{
+      const rate = await getUsdToPkrRate();
+      const pkrPrice = usdPrice * rate;
+      pkrEl.textContent = '₨ ' + pkrPrice.toLocaleString('en-PK', {maximumFractionDigits:0}) + ' / oz';
+    }catch(fxErr){
+      pkrEl.textContent = 'PKR conversion unavailable';
+    }
   }catch(err){
-    priceEl.textContent = 'Unavailable';
+    pkrEl.textContent = 'Unavailable';
+    usdEl.textContent = '--';
     updEl.textContent = '--';
   }
 }
