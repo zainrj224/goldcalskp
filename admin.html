@@ -5,394 +5,82 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Admin — Gold Rate Board</title>
 <style>
-<style>
   :root{
     --gold:#d4af37;
-    --gold-bright:#ffd700;
-    --bg:#0c0c0f;
-    --card:#17171b;
-    --card2:#1e1e23;
-    --border:#2a2a2f;
-    --green:#26c281;
-    --red:#e5484d;
-    --muted:#8a8a92;
-    --text:#ffffff;
-  }
-  html[data-theme="light"]{
+    --gold-bright:#b8860b;
     --bg:#f4f1ea;
     --card:#ffffff;
     --card2:#f6f3ec;
     --border:#e2ddd0;
+    --green:#26c281;
+    --red:#e5484d;
     --muted:#6b6a63;
     --text:#161514;
-    --gold-bright:#b8860b;
   }
-  *{box-sizing:border-box;min-width:0;}
+  *{box-sizing:border-box;}
   html,body{max-width:100%;overflow-x:hidden;}
   body{
-    margin:0;
-    font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
-    background:
-      radial-gradient(circle at 20% 0%, rgba(212,175,55,0.08), transparent 40%),
-      radial-gradient(circle at 80% 100%, rgba(212,175,55,0.06), transparent 40%),
-      var(--bg);
-    color:var(--text);
-    min-height:100vh;
-    padding:20px;
-    transition:background .25s, color .25s;
+    margin:0;background:var(--bg);color:var(--text);
+    font-family:'Segoe UI',Tahoma,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
   }
-  img{max-width:100%;display:block;}
-
-  /* ---- top bar ---- */
-  .topbar{
-    max-width:1200px;margin:0 auto 18px auto;
-    display:flex;flex-wrap:wrap;gap:12px;
-    align-items:center;justify-content:space-between;
-    border:1px solid var(--border);
-    background:var(--card);
-    border-radius:14px;
-    padding:16px 20px;
+  .admin-topbar{
+    display:flex;align-items:center;justify-content:center;gap:10px;
+    padding:18px 16px;border-bottom:1px solid var(--border);background:var(--card);
   }
-  .brand{display:flex;align-items:center;gap:12px;}
-  .brand .dot{
-    width:10px;height:10px;border-radius:50%;
-    background:var(--green);
-    box-shadow:0 0 8px var(--green);
-    animation:pulse 1.4s infinite;
+  .admin-topbar .dot{width:10px;height:10px;border-radius:50%;background:var(--gold);}
+  .admin-topbar h2{margin:0;font-size:17px;letter-spacing:.3px;}
+  .admin-wrap{max-width:520px;margin:48px auto;padding:0 16px;}
+  .admin-card{
+    background:var(--card);border:1px solid var(--border);border-radius:14px;
+    padding:28px;margin-bottom:20px;box-shadow:0 2px 10px rgba(0,0,0,0.04);
   }
-  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
-  .brand h1{
-    font-size:18px;margin:0;color:var(--gold);
-    letter-spacing:.5px;
-  }
-  .brand span{display:block;font-size:11px;color:var(--muted);font-weight:400;}
-  .clock{font-size:13px;color:var(--muted);text-align:right;}
-  .clock b{color:var(--text);display:block;font-size:15px;}
-  .topbar-right{display:flex;align-items:center;gap:16px;}
-  .theme-btn{
-    display:flex;align-items:center;gap:8px;
-    background:var(--card2);
-    border:1px solid var(--border);
-    color:var(--text);
-    padding:9px 14px;
-    border-radius:20px;
-    font-size:13px;font-weight:600;
-    cursor:pointer;
-    transition:border-color .2s, transform .1s;
-  }
-  .theme-btn:hover{border-color:var(--gold);}
-  .theme-btn:active{transform:scale(.96);}
-  .theme-btn .icon{font-size:15px;}
-
-  /* ---- floating theme toggle ---- */
-  .theme-fab{
-    position:fixed;
-    bottom:22px;right:22px;
-    z-index:999;
-    width:52px;height:52px;
-    border-radius:50%;
-    display:flex;align-items:center;justify-content:center;
-    background:var(--card);
-    border:1px solid var(--gold);
-    color:var(--text);
-    font-size:22px;
-    cursor:pointer;
-    box-shadow:0 6px 18px rgba(0,0,0,.25);
-    transition:transform .15s, box-shadow .2s;
-  }
-  .theme-fab:hover{transform:translateY(-2px);box-shadow:0 10px 22px rgba(0,0,0,.3);}
-  .theme-fab:active{transform:scale(.94);}
-
-  /* ---- master rate controls ---- */
-  .controls{
-    max-width:1200px;margin:0 auto 18px auto;
-    background:var(--card);
-    border:1px solid var(--border);
-    border-radius:14px;
-    padding:18px 20px;
-    display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
-    gap:14px;
-  }
-  .field label{
-    display:block;font-size:12px;color:var(--muted);margin-bottom:6px;
-  }
-  .field input, .field select{
-    width:100%;padding:11px 12px;border-radius:8px;
-    border:1px solid var(--border);background:var(--card2);
-    color:var(--gold-bright);font-size:16px;font-weight:600;
-  }
-  .field input:focus,.field select:focus{outline:none;border-color:var(--gold);}
-  .field small{display:block;color:var(--muted);font-size:10px;margin-top:4px;}
-
-  .live-toggle{
-    display:flex;align-items:center;gap:10px;
-    background:var(--card2);
-    border:1px solid var(--border);
-    border-radius:8px;padding:10px 12px;
-    cursor:pointer;user-select:none;
-  }
-  .live-toggle input{width:16px;height:16px;accent-color:var(--gold);}
-  .live-toggle span{font-size:13px;color:#ddd;}
-
-  /* ---- ticker ---- */
-  .ticker-wrap{
-    max-width:1200px;margin:0 auto 18px auto;
-    overflow:hidden;border:1px solid var(--border);
-    border-radius:10px;background:var(--card);
-  }
-  .ticker{
-    display:flex;flex-wrap:nowrap;gap:40px;white-space:nowrap;
-    padding:10px 20px;
-    width:max-content;
-    animation:scroll 40s linear infinite;
-    will-change:transform;
-  }
-  .ticker span{font-size:13px;color:var(--muted);flex-shrink:0;white-space:nowrap;}
-  .ticker b{color:var(--gold-bright);}
-  @keyframes scroll{
-    from{transform:translateX(0);}
-    to{transform:translateX(-50%);}
-  }
-
-  /* ---- city grid ---- */
-  .grid{
-    max-width:1200px;margin:0 auto;
-    display:grid;
-    grid-template-columns:repeat(auto-fill,minmax(270px,1fr));
-    gap:16px;
-  }
-  .city-card{
-    background:var(--card);
-    border:1px solid var(--border);
-    border-radius:14px;
-    padding:18px;
-    position:relative;
-    transition:border-color .2s, transform .2s;
-  }
-  .city-card:hover{transform:translateY(-2px);border-color:#3a3a40;}
-  .city-card.home{
-    border-color:var(--gold);
-    box-shadow:0 0 0 1px var(--gold), 0 10px 25px rgba(212,175,55,.15);
-  }
-  .city-card.home::before{
-    content:'HOME BRANCH';
-    position:absolute;top:-9px;right:14px;
-    background:var(--gold);color:#111;
-    font-size:9px;font-weight:700;letter-spacing:.5px;
-    padding:3px 8px;border-radius:20px;
-  }
-  .city-head{
-    display:flex;justify-content:space-between;align-items:center;
-    margin-bottom:12px;
-  }
-  .city-head h3{margin:0;font-size:16px;color:var(--text);}
-  .city-head .flag{font-size:12px;color:var(--muted);}
-  .rate-main{
-    display:flex;align-items:baseline;gap:8px;margin-bottom:2px;
-  }
-  .rate-main .val{
-    font-size:26px;font-weight:700;color:var(--gold-bright);
-    transition:color .3s;
-  }
-  .rate-main .unit{font-size:12px;color:var(--muted);}
-  .delta{
-    font-size:12px;font-weight:600;margin-bottom:14px;
-    display:inline-flex;align-items:center;gap:4px;
-  }
-  .delta.up{color:var(--green);}
-  .delta.down{color:var(--red);}
-  .sub-rates{
-    display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;
-    border-top:1px dashed var(--border);
-    padding-top:12px;
-  }
-  .sub-rates div{font-size:11px;color:var(--muted);}
-  .sub-rates div b{
-    display:block;color:var(--text);font-size:14px;font-weight:600;margin-top:2px;
-    opacity:.92;
-  }
-
-  .grid{margin-top:26px;}
-
-  /* ---- making charges calculator ---- */
-  .calc-section{
-    max-width:1200px;margin:0 auto 0 auto;
-    background:var(--card);
-    border:1px solid var(--border);
-    border-radius:14px;
-    padding:22px;
-  }
-  .calc-section h2{
-    color:var(--gold);margin:0 0 4px 0;font-size:17px;
-    text-transform:uppercase;letter-spacing:.5px;
-  }
-  .calc-section .hint{color:var(--muted);font-size:12px;margin-bottom:18px;}
-  .calc-grid{
-    display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
-    gap:16px;
-  }
-  .calc-grid .box label{
-    display:block;font-size:13px;color:#b0b0b0;margin-bottom:6px;
-  }
-  .calc-grid input{
-    width:100%;padding:12px;border-radius:8px;
-    border:1px solid var(--border);background:var(--card2);
-    color:var(--gold-bright);font-size:17px;font-weight:700;
-  }
-  .calc-grid input[readonly]{color:var(--green);background:#141416;}
-  .field input[readonly],.bill-inputs input[readonly]{color:var(--gold-bright);background:#141416;cursor:not-allowed;}
-  .calc-grid input:focus{outline:none;border-color:var(--gold-bright);}
-
-  /* ---- full bill / piece calculator ---- */
-  .bill-section{
-    max-width:1200px;margin:18px auto 0 auto;
-    background:var(--card);
-    border:1px solid var(--border);
-    border-radius:14px;
-    padding:22px;
-  }
-  .bill-section h2{
-    color:var(--gold);margin:0 0 4px 0;font-size:17px;
-    text-transform:uppercase;letter-spacing:.5px;
-  }
-  .bill-section .hint{color:var(--muted);font-size:12px;margin-bottom:18px;}
-  .bill-inputs{
-    display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
-    gap:16px;margin-bottom:18px;
-  }
-  .bill-inputs .box label{
-    display:block;font-size:13px;color:#b0b0b0;margin-bottom:6px;
-  }
-  .bill-inputs input{
-    width:100%;padding:12px;border-radius:8px;
-    border:1px solid var(--border);background:var(--card2);
-    color:var(--gold-bright);font-size:17px;font-weight:700;
-  }
-  .bill-inputs input:focus{outline:none;border-color:var(--gold-bright);}
-  .bill-inputs small{display:block;color:var(--muted);font-size:10px;margin-top:4px;}
-  .bill-breakdown{
-    border-top:1px dashed var(--border);
-    padding-top:16px;
-    display:grid;gap:10px;
-  }
-  .bill-row{
-    display:flex;justify-content:space-between;align-items:center;
-    font-size:14px;color:#ddd;
-    padding:6px 0;
-  }
-  .bill-row span.label{color:var(--muted);}
-  .bill-row span.val{font-weight:700;color:var(--text);}
-  .bill-row.total{
-    border-top:1px solid var(--border);
-    margin-top:6px;padding-top:14px;
-  }
-  .bill-row.total span.val{color:var(--gold-bright);font-size:20px;}
-  .bill-formula{
-    font-size:11px;color:var(--muted);text-align:center;margin-top:12px;
-    font-style:italic;
-  }
-
-  footer{
-    max-width:1200px;margin:22px auto 0 auto;
-    text-align:center;color:var(--muted);font-size:11px;
-    line-height:1.6;
-  }
-
-  /* ---- ad slots ---- */
-  .page-wrap{
-    max-width:1900px;
-    width:100%;
-    margin:0 auto;
-    display:grid;
-    grid-template-columns:280px minmax(0,1fr) 280px;
-    gap:16px;
-    align-items:start;
-  }
-  .main-col{width:100%;min-width:0;}
-  .ad-rail{
-    position:sticky;top:20px;
-    height:calc(100vh - 40px);
-    display:flex;flex-direction:column;
-    width:100%;
-  }
-  .ad-rail a{
-    flex:1;
-    display:flex;
-  }
-  .ad-rail img{
-    width:100%;max-width:280px;height:100%;
-    object-fit:contain;
-    border-radius:12px;
-    border:1px solid var(--border);
-    box-shadow:0 10px 25px rgba(0,0,0,.35);
-  }
-  @media (max-width:1560px){
-    .page-wrap{grid-template-columns:minmax(0,1fr);}
-    .ad-rail{display:none;}
-  }
-  .ad-leaderboard{
-    max-width:1200px;width:100%;margin:0 auto 18px auto;
-    text-align:center;
-  }
-  .ad-leaderboard img{
-    width:100%;max-width:728px;height:auto;
-    border-radius:10px;border:1px solid var(--border);
-    box-shadow:0 6px 18px rgba(0,0,0,.3);
-    margin:0 auto;
-  }
-  .ad-leaderboard .ad-label, .ad-rail .ad-label, .ad-square-tile .ad-label{
-    display:block;font-size:9px;letter-spacing:1px;color:var(--muted);
-    text-transform:uppercase;margin-bottom:6px;text-align:center;
-  }
-  .ad-square-tile{
-    background:var(--card);
-    border:1px solid var(--border);
-    border-radius:14px;
-    padding:10px;
-    display:flex;flex-direction:column;align-items:center;
-    justify-content:center;
-    width:100%;
-  }
-  .ad-square-tile img{
-    width:100%;border-radius:10px;
-  }
-
-  @media (max-width:480px){
-    body{padding:10px;}
-    .topbar,.controls,.calc-section{padding:14px;}
-    .brand h1{font-size:15px;}
-    .brand span{font-size:10px;}
-    .rate-main .val{font-size:22px;}
-  }
-</style>
-  .admin-wrap{max-width:480px;margin:60px auto;padding:0 16px;}
-  .admin-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:28px;}
   .admin-card h1{font-size:20px;color:var(--gold-bright);margin:0 0 4px;}
   .admin-card .sub{color:var(--muted);font-size:13px;margin-bottom:22px;}
-  .admin-card label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;}
-  .admin-card input[type="number"],.admin-card input[type="password"]{
+  .admin-card label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;margin-top:14px;}
+  .admin-card label:first-of-type{margin-top:0;}
+  .admin-card input[type="number"],
+  .admin-card input[type="password"],
+  .admin-card select{
     width:100%;background:var(--card2);border:1px solid var(--border);color:var(--text);
-    border-radius:8px;padding:12px 14px;font-size:16px;font-weight:600;margin-bottom:16px;
+    border-radius:8px;padding:12px 14px;font-size:16px;font-weight:600;
   }
-  .admin-card input:focus{outline:none;border-color:var(--gold);}
+  .admin-card input:focus,.admin-card select:focus{outline:none;border-color:var(--gold);}
+  .admin-card small{display:block;color:var(--muted);font-size:11px;margin-top:4px;font-weight:400;}
+  .live-row{display:flex;align-items:center;gap:10px;margin-top:16px;}
+  .live-row input[type="checkbox"]{width:18px;height:18px;accent-color:var(--gold);}
+  .live-row span{font-size:13px;color:var(--text);}
   .admin-card button{
     width:100%;background:var(--gold);color:#141416;border:none;border-radius:8px;
-    padding:13px;font-size:15px;font-weight:700;cursor:pointer;
+    padding:13px;font-size:15px;font-weight:700;cursor:pointer;margin-top:22px;
+    transition:background .15s;
   }
-  .admin-card button:hover{background:var(--gold-bright);}
-  .status-msg{margin-top:14px;font-size:13px;text-align:center;min-height:18px;}
+  .admin-card button:hover{background:var(--gold-bright);color:#fff;}
+  .status-msg{margin-top:14px;font-size:13px;text-align:center;min-height:18px;font-weight:600;}
   .status-msg.ok{color:var(--green);}
   .status-msg.err{color:var(--red);}
-  .current-rate{background:var(--card2);border:1px solid var(--border);border-radius:8px;
-    padding:12px 14px;margin-bottom:20px;font-size:14px;color:var(--muted);}
+  .current-rate{
+    background:var(--card2);border:1px solid var(--border);border-radius:8px;
+    padding:12px 14px;margin-bottom:6px;font-size:14px;color:var(--muted);
+  }
   .current-rate b{color:var(--gold-bright);font-size:16px;}
-  .back-link{display:block;text-align:center;margin-top:18px;color:var(--muted);font-size:13px;text-decoration:none;}
+  .back-link{
+    display:block;text-align:center;margin-top:6px;color:var(--muted);
+    font-size:13px;text-decoration:none;
+  }
   .back-link:hover{color:var(--gold-bright);}
+  .divider{border:none;border-top:1px solid var(--border);margin:22px 0;}
 </style>
 </head>
 <body>
+
+<div class="admin-topbar">
+  <div class="dot"></div>
+  <h2>Rajput Jewelers — Admin Panel</h2>
+</div>
+
 <div class="admin-wrap">
+
   <div class="admin-card" id="loginCard">
     <h1>Admin Login</h1>
     <div class="sub">Gold rate board manage karne ke liye passcode daalein</div>
@@ -402,23 +90,60 @@
     <div class="status-msg" id="loginMsg"></div>
   </div>
 
-  <div class="admin-card" id="rateCard" style="display:none;">
-    <h1>Set Tola Rate</h1>
-    <div class="sub">Yeh rate live board par sab users ko dikhega</div>
-    <div class="current-rate">Current Rate: <b id="currentRateDisp">--</b> PKR / Tola</div>
-    <label for="rateInput">Base Rate — Per Tola 24K (PKR)</label>
-    <input type="number" id="rateInput" placeholder="e.g. 450000">
-    <button onclick="saveRate()">Save Rate</button>
-    <div class="status-msg" id="saveMsg"></div>
+  <div id="rateCard" style="display:none;">
+
+    <div class="admin-card">
+      <h1>Base Tola Rate</h1>
+      <div class="sub">Yeh rate live board par sab users ko dikhega</div>
+      <div class="current-rate">Current Rate: <b id="currentRateDisp">--</b> PKR / Tola</div>
+      <label for="rateInput">Base Rate — Per Tola 24K (PKR)</label>
+      <input type="number" id="rateInput" placeholder="e.g. 450000">
+    </div>
+
+    <div class="admin-card">
+      <h1>Board Settings</h1>
+      <div class="sub">Yeh settings live board ke calculator aur ticker ko control karti hain</div>
+
+      <label for="mashaInput">Making Charges — Per Tola (Masha)</label>
+      <input type="number" id="mashaInput" placeholder="e.g. 2">
+      <small>1 Tola = 12 Masha</small>
+
+      <label for="volInput">Simulated Live Volatility</label>
+      <select id="volInput">
+        <option value="0">Off (Static)</option>
+        <option value="200">Low</option>
+        <option value="500">Medium</option>
+        <option value="1000">High</option>
+      </select>
+      <small>Board ko trader-terminal jaisa flicker karta hai</small>
+
+      <div class="live-row">
+        <input type="checkbox" id="liveInput">
+        <span>Live Auto-Update (har 2.5 sec)</span>
+      </div>
+
+      <hr class="divider">
+      <button onclick="saveAll()">Save All Settings</button>
+      <div class="status-msg" id="saveMsg"></div>
+    </div>
+
   </div>
 
   <a class="back-link" href="index.html">← Back to Live Board</a>
 </div>
 
 <script>
-  const ADMIN_RATE_KEY = 'gc_admin_tola_rate';
+  const KEYS = {
+    rate: 'gc_admin_tola_rate',
+    masha: 'gc_admin_masha',
+    vol: 'gc_admin_volatility',
+    live: 'gc_admin_live'
+  };
   const ADMIN_PASS_KEY = 'gc_admin_pass';
   const DEFAULT_TOLA_RATE = 450000;
+  const DEFAULT_MASHA = 2;
+  const DEFAULT_VOL = '200';
+  const DEFAULT_LIVE = '1';
   const DEFAULT_PASS = 'admin123'; // change this after first login
 
   function fmt(n){ return n.toLocaleString('en-PK', {maximumFractionDigits:0}); }
@@ -442,23 +167,46 @@
   function showRateCard(){
     document.getElementById('loginCard').style.display = 'none';
     document.getElementById('rateCard').style.display = 'block';
-    const saved = parseFloat(localStorage.getItem(ADMIN_RATE_KEY));
-    const rate = (isFinite(saved) && saved > 0) ? saved : DEFAULT_TOLA_RATE;
+
+    const savedRate = parseFloat(localStorage.getItem(KEYS.rate));
+    const rate = (isFinite(savedRate) && savedRate > 0) ? savedRate : DEFAULT_TOLA_RATE;
     document.getElementById('currentRateDisp').textContent = fmt(rate);
     document.getElementById('rateInput').value = rate;
+
+    const savedMasha = parseFloat(localStorage.getItem(KEYS.masha));
+    document.getElementById('mashaInput').value = (isFinite(savedMasha) && savedMasha >= 0) ? savedMasha : DEFAULT_MASHA;
+
+    document.getElementById('volInput').value = localStorage.getItem(KEYS.vol) || DEFAULT_VOL;
+
+    const live = localStorage.getItem(KEYS.live);
+    document.getElementById('liveInput').checked = (live === null) ? true : (live === '1');
   }
 
-  function saveRate(){
-    const val = parseFloat(document.getElementById('rateInput').value);
+  function saveAll(){
+    const rate = parseFloat(document.getElementById('rateInput').value);
+    const masha = parseFloat(document.getElementById('mashaInput').value);
+    const vol = document.getElementById('volInput').value;
+    const live = document.getElementById('liveInput').checked;
     const msg = document.getElementById('saveMsg');
-    if(!isFinite(val) || val <= 0){
-      msg.textContent = 'Sahi rate daalein.';
+
+    if(!isFinite(rate) || rate <= 0){
+      msg.textContent = 'Sahi base rate daalein.';
       msg.className = 'status-msg err';
       return;
     }
-    localStorage.setItem(ADMIN_RATE_KEY, val);
-    document.getElementById('currentRateDisp').textContent = fmt(val);
-    msg.textContent = 'Rate save ho gaya — Live Board update ho jayega.';
+    if(!isFinite(masha) || masha < 0){
+      msg.textContent = 'Sahi making charges (masha) daalein.';
+      msg.className = 'status-msg err';
+      return;
+    }
+
+    localStorage.setItem(KEYS.rate, rate);
+    localStorage.setItem(KEYS.masha, masha);
+    localStorage.setItem(KEYS.vol, vol);
+    localStorage.setItem(KEYS.live, live ? '1' : '0');
+
+    document.getElementById('currentRateDisp').textContent = fmt(rate);
+    msg.textContent = 'Settings save ho gayi — Live Board update ho jayega.';
     msg.className = 'status-msg ok';
   }
 

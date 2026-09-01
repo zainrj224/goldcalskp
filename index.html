@@ -134,6 +134,39 @@
   .live-toggle input{width:16px;height:16px;accent-color:var(--gold);}
   .live-toggle span{font-size:13px;color:#ddd;}
 
+  /* ---- home branch card ---- */
+  .home-branch-card{
+    max-width:1200px;margin:0 auto 18px auto;
+    background:linear-gradient(120deg,var(--card) 60%,var(--card2) 100%);
+    border:1px solid var(--gold);
+    border-radius:14px;
+    padding:22px 26px;
+    display:flex;align-items:center;justify-content:space-between;
+    flex-wrap:wrap;gap:16px;
+  }
+  .home-branch-card .hb-badge{
+    display:inline-block;background:var(--gold);color:#141416;
+    font-size:10px;font-weight:800;letter-spacing:.06em;
+    padding:3px 9px;border-radius:5px;margin-bottom:8px;
+  }
+  .home-branch-card h3{margin:0 0 4px;font-size:19px;color:var(--gold-bright);}
+  .home-branch-card .hb-sub{font-size:12px;color:var(--muted);margin-bottom:10px;}
+  .home-branch-card .hb-call{
+    display:inline-block;font-size:13px;font-weight:600;color:var(--text);
+    text-decoration:none;background:var(--card2);border:1px solid var(--border);
+    border-radius:8px;padding:7px 12px;
+  }
+  .home-branch-card .hb-call:hover{border-color:var(--gold);}
+  .home-branch-card .hb-right{text-align:right;}
+  .home-branch-card .hb-rate-label{font-size:11px;color:var(--muted);margin-bottom:4px;}
+  .home-branch-card .hb-rate-val{font-size:30px;font-weight:800;color:var(--gold-bright);line-height:1.1;}
+  .home-branch-card .hb-rate-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+  @media (max-width:520px){
+    .home-branch-card{padding:18px;}
+    .home-branch-card .hb-right{text-align:left;}
+    .home-branch-card .hb-rate-val{font-size:26px;}
+  }
+
   /* ---- ticker ---- */
   .ticker-wrap{
     max-width:1200px;margin:0 auto 18px auto;
@@ -403,31 +436,43 @@
   </a>
 </div>
 
-<div class="controls">
+<!-- Controls are now admin-only (set via admin.html). Kept hidden in the DOM so the page logic keeps working. -->
+<div class="controls" style="display:none;">
   <div class="field">
     <label for="baseTola">Base Rate — Per Tola 24K (PKR)</label>
-    <input type="number" id="baseTola" placeholder="e.g. 450000" readonly>
-    <small>Admin ki taraf se set kiya gaya hai — sab cities isi se calculate hongi</small>
+    <input type="number" id="baseTola" readonly>
   </div>
   <div class="field">
     <label for="mashaMaking">Making Charges — Per Tola (Masha)</label>
-    <input type="number" id="mashaMaking" placeholder="e.g. 12" oninput="rebuild()">
-    <small>1 Tola = 12 Masha</small>
+    <input type="number" id="mashaMaking" readonly>
   </div>
   <div class="field">
     <label for="volatility">Simulated Live Volatility</label>
-    <select id="volatility" onchange="restartLive()">
+    <select id="volatility">
       <option value="0">Off (Static)</option>
-      <option value="200" selected>Low</option>
+      <option value="200">Low</option>
       <option value="500">Medium</option>
       <option value="1000">High</option>
     </select>
-    <small>Board ko trader-terminal jaisa flicker karta hai</small>
   </div>
   <label class="live-toggle">
-    <input type="checkbox" id="liveToggle" checked onchange="restartLive()">
-    <span>Live Auto-Update (har 2.5 sec)</span>
+    <input type="checkbox" id="liveToggle">
+    <span>Live Auto-Update</span>
   </label>
+</div>
+
+<div class="home-branch-card" id="homeBranchCard">
+  <div class="hb-left">
+    <div class="hb-badge">HOME BRANCH</div>
+    <h3>Rajput Jewelers — Sheikhupura</h3>
+    <div class="hb-sub">Timeless Artistry · Gold &amp; Jewelry Showroom</div>
+    <a class="hb-call" href="tel:03098092475">📞 Call: 0309-8092475</a>
+  </div>
+  <div class="hb-right">
+    <div class="hb-rate-label">Today's Rate (24K / Tola)</div>
+    <div class="hb-rate-val" id="hbRateVal">--</div>
+    <div class="hb-rate-sub">PKR</div>
+  </div>
 </div>
 
 <div class="ticker-wrap">
@@ -533,20 +578,12 @@
 <script>
 const GRAM_PER_TOLA = 11.664;
 
-// city name, small % offset from base (typical local variation), home flag
+// city name, flat PKR offset from base rate (fixed local difference), home flag
 const CITIES = [
-  { name: "Sheikhupura",  offset: 0.000,  home: true  },
-  { name: "Lahore",       offset: 0.001,  home: false },
-  { name: "Karachi",      offset: -0.002, home: false },
-  { name: "Islamabad",    offset: 0.0015, home: false },
-  { name: "Rawalpindi",   offset: 0.0012, home: false },
-  { name: "Faisalabad",   offset: 0.0005, home: false },
-  { name: "Multan",       offset: -0.0008,home: false },
-  { name: "Gujranwala",   offset: 0.0003, home: false },
-  { name: "Peshawar",     offset: -0.0015,home: false },
-  { name: "Quetta",       offset: -0.0025,home: false },
-  { name: "Sialkot",      offset: 0.0007, home: false },
-  { name: "Sargodha",     offset: 0.0002, home: false },
+  { name: "Sheikhupura",  offsetPKR: 0,      home: true  },
+  { name: "Lahore",       offsetPKR: 15000,  home: false },
+  { name: "Karachi",      offsetPKR: -5000,  home: false },
+  { name: "Faisalabad",   offsetPKR: 2000,   home: false },
 ];
 
 let cityState = {};   // current tola rate per city
@@ -606,7 +643,7 @@ function buildCards(){
 function computeCityRates(){
   const base = getBase();
   CITIES.forEach(c=>{
-    const val = base * (1 + c.offset);
+    const val = base > 0 ? Math.max(0, base + c.offsetPKR) : 0;
     cityState[c.name] = val;
   });
 }
@@ -688,6 +725,12 @@ function updateBill(){
 }
 document.getElementById('billTolaRate').addEventListener('input', function(){ this.dataset.touched = '1'; });
 
+function updateHomeBranch(){
+  const val = cityState['Sheikhupura'] || 0;
+  const el = document.getElementById('hbRateVal');
+  if(el) el.textContent = val > 0 ? fmt(val) : '--';
+}
+
 function rebuild(){
   prevState = {...cityState};
   computeCityRates();
@@ -695,6 +738,7 @@ function rebuild(){
   buildTicker();
   updateCalculator();
   updateBill();
+  updateHomeBranch();
 }
 
 function applyVolatility(){
@@ -735,33 +779,51 @@ function toggleTheme(){
   applyTheme(current === 'dark' ? 'light' : 'dark');
 }
 
-// Admin-set base tola rate (shared key with admin.html)
-const ADMIN_RATE_KEY = 'gc_admin_tola_rate';
+// Admin-controlled settings (shared keys with admin.html)
+const ADMIN_KEYS = {
+  rate:  'gc_admin_tola_rate',
+  masha: 'gc_admin_masha',
+  vol:   'gc_admin_volatility',
+  live:  'gc_admin_live'
+};
 const DEFAULT_TOLA_RATE = 450000;
-function loadAdminRate(){
-  const saved = parseFloat(localStorage.getItem(ADMIN_RATE_KEY));
-  const rate = (isFinite(saved) && saved > 0) ? saved : DEFAULT_TOLA_RATE;
+const DEFAULT_MASHA = 2;
+const DEFAULT_VOL = '200';
+const DEFAULT_LIVE = '1';
+
+function loadAdminSettings(){
+  const savedRate = parseFloat(localStorage.getItem(ADMIN_KEYS.rate));
+  const rate = (isFinite(savedRate) && savedRate > 0) ? savedRate : DEFAULT_TOLA_RATE;
   document.getElementById('baseTola').value = rate;
-  return rate;
+
+  const savedMasha = parseFloat(localStorage.getItem(ADMIN_KEYS.masha));
+  document.getElementById('mashaMaking').value = (isFinite(savedMasha) && savedMasha >= 0) ? savedMasha : DEFAULT_MASHA;
+
+  document.getElementById('volatility').value = localStorage.getItem(ADMIN_KEYS.vol) || DEFAULT_VOL;
+
+  const live = localStorage.getItem(ADMIN_KEYS.live);
+  document.getElementById('liveToggle').checked = (live === null) ? (DEFAULT_LIVE === '1') : (live === '1');
 }
-// keep in sync if admin updates the rate in another tab/window
+
+// keep in sync if admin updates settings in another tab/window
 window.addEventListener('storage', function(e){
-  if(e.key === ADMIN_RATE_KEY){
-    loadAdminRate();
+  if(Object.values(ADMIN_KEYS).includes(e.key)){
+    loadAdminSettings();
     rebuild();
+    restartLive();
   }
 });
 
 // init
 applyTheme('light');
 buildCards();
-loadAdminRate();
-document.getElementById('mashaMaking').value = 2;
+loadAdminSettings();
 computeCityRates();
 renderCards();
 buildTicker();
 updateCalculator();
 updateBill();
+updateHomeBranch();
 restartLive();
 tickClock();
 setInterval(tickClock, 1000);
