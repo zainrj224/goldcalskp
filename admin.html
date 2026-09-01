@@ -132,6 +132,27 @@
       <div class="status-msg" id="saveMsg"></div>
     </div>
 
+    <div class="admin-card" id="billCalcCard">
+      <h1>Full Bill Calculator</h1>
+      <div class="sub">Fast calculation ke liye — customer ka bill yahin nikal lein</div>
+
+      <label for="calcTolaRate">1 Tola Price (PKR)</label>
+      <input type="number" id="calcTolaRate" oninput="runBillCalc()">
+
+      <label for="calcMasha">Standard Making (Grams / Tola)</label>
+      <input type="number" id="calcMasha" oninput="runBillCalc()">
+
+      <label for="calcWeight">Product Weight (Grams)</label>
+      <input type="number" id="calcWeight" placeholder="e.g. 12.5" oninput="runBillCalc()">
+
+      <hr class="divider">
+
+      <div class="current-rate">Gold Rate — Per Gram: <b id="calcGramRate">--</b></div>
+      <div class="current-rate">Gold Value: <b id="calcGoldValue">--</b></div>
+      <div class="current-rate">Making Charges: <b id="calcMakingCost">--</b></div>
+      <div class="current-rate">Total Bill Amount: <b id="calcTotal">--</b></div>
+    </div>
+
   </div>
 
   <a class="back-link" href="index.html">← Back to Live Board</a>
@@ -204,6 +225,31 @@
 
     const spot = settings ? settings.spot : null;
     document.getElementById('spotInput').checked = !!spot;
+
+    // pre-fill the fast calculator with the current live values
+    document.getElementById('calcTolaRate').value = rate;
+    document.getElementById('calcMasha').value = masha;
+    runBillCalc();
+  }
+
+  const GRAM_PER_TOLA = 11.664;
+
+  function fmt2(n){ return n.toLocaleString('en-PK', {maximumFractionDigits:0}); }
+
+  function runBillCalc(){
+    const pT = parseFloat(document.getElementById('calcTolaRate').value) || 0;
+    const M = parseFloat(document.getElementById('calcMasha').value) || 0;
+    const P = parseFloat(document.getElementById('calcWeight').value) || 0;
+
+    const gramRate = pT / GRAM_PER_TOLA;
+    const goldValue = P * gramRate;
+    const makingCost = (P / GRAM_PER_TOLA) * (M / GRAM_PER_TOLA) * pT;
+    const total = goldValue + makingCost;
+
+    document.getElementById('calcGramRate').textContent = gramRate>0 ? fmt2(gramRate) + ' PKR' : '--';
+    document.getElementById('calcGoldValue').textContent = goldValue>0 ? fmt2(goldValue) + ' PKR' : '--';
+    document.getElementById('calcMakingCost').textContent = makingCost>0 ? fmt2(makingCost) + ' PKR' : '--';
+    document.getElementById('calcTotal').textContent = total>0 ? fmt2(total) + ' PKR' : '--';
   }
 
   async function saveAll(){
