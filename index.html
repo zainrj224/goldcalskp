@@ -240,6 +240,7 @@
     color:var(--gold-bright);font-size:17px;font-weight:700;
   }
   .calc-grid input[readonly]{color:var(--green);background:#141416;}
+  .field input[readonly],.bill-inputs input[readonly]{color:var(--gold-bright);background:#141416;cursor:not-allowed;}
   .calc-grid input:focus{outline:none;border-color:var(--gold-bright);}
 
   /* ---- full bill / piece calculator ---- */
@@ -405,8 +406,8 @@
 <div class="controls">
   <div class="field">
     <label for="baseTola">Base Rate — Per Tola 24K (PKR)</label>
-    <input type="number" id="baseTola" placeholder="e.g. 285000" oninput="rebuild()">
-    <small>Yeh master rate hai — sab cities isi se calculate hongi</small>
+    <input type="number" id="baseTola" placeholder="e.g. 450000" readonly>
+    <small>Admin ki taraf se set kiya gaya hai — sab cities isi se calculate hongi</small>
   </div>
   <div class="field">
     <label for="mashaMaking">Making Charges — Per Tola (Masha)</label>
@@ -461,14 +462,14 @@
   <div class="hint">1 Tola ka rate daalein, product ka weight (grams mein) daalein — poori calculation neeche dikh jayegi. Making charges auto 2 gram/tola hai, chahe to manually adjust kar lein.</div>
   <div class="bill-inputs">
     <div class="box">
-      <label for="billTolaRate">1 Tola Price (PKR) — 24K</label>
-      <input type="number" id="billTolaRate" placeholder="e.g. 285000" oninput="updateBill()">
+      <label for="billTolaRate">1 Tola Price (PKR)</label>
+      <input type="number" id="billTolaRate" placeholder="e.g. 450000" oninput="updateBill()">
       <small>Current tola rate jo aap ne upar set kiya (ya alag se yahan daal sakte hain)</small>
     </div>
     <div class="box">
       <label for="billMakingGrams">Standard Making (Grams / Tola)</label>
-      <input type="number" id="billMakingGrams" value="2" oninput="updateBill()">
-      <small>Default 2 gram/tola — manually adjust kar sakte hain</small>
+      <input type="number" id="billMakingGrams" value="2" readonly>
+      <small>Fixed — 2 gram/tola default</small>
     </div>
     <div class="box">
       <label for="billProductWeight">Product Weight (Grams)</label>
@@ -479,7 +480,7 @@
 
   <div class="bill-breakdown">
     <div class="bill-row">
-      <span class="label">Gold Rate — Per Gram (24K)</span>
+      <span class="label">Gold Rate — Per Gram</span>
       <span class="val" id="billGramRate">--</span>
     </div>
     <div class="bill-row">
@@ -487,11 +488,11 @@
       <span class="val" id="billWeightDisp">--</span>
     </div>
     <div class="bill-row">
-      <span class="label">Gold Value (Weight × Per Gram Rate)</span>
+      <span class="label">Gold Value</span>
       <span class="val" id="billGoldValue">--</span>
     </div>
     <div class="bill-row">
-      <span class="label">Making Charges (Weight × Rate/Tola × Making Grams / Tola)</span>
+      <span class="label">Making Charges</span>
       <span class="val" id="billMakingCost">--</span>
     </div>
     <div class="bill-row total">
@@ -734,10 +735,27 @@ function toggleTheme(){
   applyTheme(current === 'dark' ? 'light' : 'dark');
 }
 
+// Admin-set base tola rate (shared key with admin.html)
+const ADMIN_RATE_KEY = 'gc_admin_tola_rate';
+const DEFAULT_TOLA_RATE = 450000;
+function loadAdminRate(){
+  const saved = parseFloat(localStorage.getItem(ADMIN_RATE_KEY));
+  const rate = (isFinite(saved) && saved > 0) ? saved : DEFAULT_TOLA_RATE;
+  document.getElementById('baseTola').value = rate;
+  return rate;
+}
+// keep in sync if admin updates the rate in another tab/window
+window.addEventListener('storage', function(e){
+  if(e.key === ADMIN_RATE_KEY){
+    loadAdminRate();
+    rebuild();
+  }
+});
+
 // init
 applyTheme('light');
 buildCards();
-document.getElementById('baseTola').value = 285000;
+loadAdminRate();
 document.getElementById('mashaMaking').value = 2;
 computeCityRates();
 renderCards();
