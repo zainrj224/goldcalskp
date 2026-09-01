@@ -24,9 +24,26 @@ function json(statusCode, body, extraHeaders) {
   };
 }
 
+function getBlobsStore() {
+  // Netlify normally auto-injects the Blobs connection context into every
+  // function at deploy time. On some deploys that injection doesn't happen
+  // (a known platform quirk — see https://github.com/netlify/blobs/issues/175),
+  // which surfaces as MissingBlobsEnvironmentError. As a fallback, allow
+  // configuring the store explicitly via env vars: BLOBS_SITE_ID (Site
+  // settings > General > Site details > Site ID) and BLOBS_API_TOKEN (a
+  // Personal Access Token from https://app.netlify.com/user/applications).
+  const siteID = process.env.BLOBS_SITE_ID;
+  const token = process.env.BLOBS_API_TOKEN;
+
+  if (siteID && token) {
+    return getStore({ name: STORE_NAME, siteID, token });
+  }
+  return getStore(STORE_NAME);
+}
+
 exports.handler = async (event) => {
   try {
-    const store = getStore(STORE_NAME);
+    const store = getBlobsStore();
 
     if (event.httpMethod === 'GET') {
       let settings;
