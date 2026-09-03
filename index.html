@@ -28,6 +28,46 @@
   }
   *{box-sizing:border-box;min-width:0;}
   html,body{max-width:100%;overflow-x:hidden;}
+  .lead-overlay{
+    position:fixed;inset:0;background:rgba(0,0,0,0.6);
+    display:flex;align-items:center;justify-content:center;
+    z-index:9999;padding:16px;opacity:0;pointer-events:none;
+    transition:opacity .2s ease;
+  }
+  .lead-overlay.show{opacity:1;pointer-events:auto;}
+  .lead-modal{
+    background:var(--card);border:1px solid var(--border);border-radius:14px;
+    max-width:360px;width:100%;padding:26px 24px;position:relative;
+    box-shadow:0 10px 40px rgba(0,0,0,0.35);
+    transform:translateY(10px) scale(.98);transition:transform .2s ease;
+  }
+  .lead-overlay.show .lead-modal{transform:translateY(0) scale(1);}
+  .lead-modal h3{margin:0 0 6px;font-size:18px;color:var(--gold-bright);}
+  .lead-modal p.lead-sub{margin:0 0 18px;font-size:13px;color:var(--muted);}
+  .lead-modal label{display:block;font-size:12px;color:var(--muted);margin:12px 0 6px;}
+  .lead-modal label:first-of-type{margin-top:0;}
+  .lead-modal input{
+    width:100%;background:var(--card2);border:1px solid var(--border);color:var(--text);
+    border-radius:8px;padding:11px 13px;font-size:15px;font-weight:600;
+  }
+  .lead-modal input:focus{outline:none;border-color:var(--gold);}
+  .lead-modal .lead-err{color:var(--red);font-size:12px;min-height:16px;margin-top:8px;}
+  .lead-modal .lead-never-row{display:flex;align-items:center;gap:8px;margin-top:10px;}
+  .lead-modal .lead-never-row input[type="checkbox"]{width:16px;height:16px;accent-color:var(--gold);}
+  .lead-modal .lead-never-row label{display:inline;margin:0;font-size:12px;color:var(--muted);cursor:pointer;}
+  .lead-modal .lead-btns{display:flex;gap:10px;margin-top:18px;}
+  .lead-modal button{
+    flex:1;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;
+  }
+  .lead-modal .lead-submit{background:var(--gold);color:#141416;}
+  .lead-modal .lead-submit:hover{background:var(--gold-bright);}
+  .lead-modal .lead-skip{background:transparent;color:var(--muted);border:1px solid var(--border);}
+  .lead-modal .lead-skip:hover{color:var(--text);}
+  .lead-modal .lead-close{
+    position:absolute;top:12px;right:14px;background:none;border:none;color:var(--muted);
+    font-size:20px;cursor:pointer;line-height:1;padding:2px 4px;
+  }
+  .lead-modal .lead-close:hover{color:var(--text);}
   body{
     margin:0;
     font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
@@ -417,6 +457,28 @@
 </style>
 </head>
 <body>
+
+<div class="lead-overlay" id="leadOverlay">
+  <div class="lead-modal">
+    <button class="lead-close" id="leadClose" aria-label="Close">&times;</button>
+    <h3>Khush Aamdeed 👋</h3>
+    <p class="lead-sub">Apna naam aur mobile number chhor jayein — hum aapko updates aur best rate offers denge.</p>
+    <label for="leadName">Naam</label>
+    <input type="text" id="leadName" placeholder="Aapka naam" autocomplete="name">
+    <label for="leadPhone">Mobile Number</label>
+    <input type="tel" id="leadPhone" placeholder="03xx-xxxxxxx" autocomplete="tel">
+    <div class="lead-err" id="leadErr"></div>
+    <div class="lead-never-row">
+      <input type="checkbox" id="leadNeverShow">
+      <label for="leadNeverShow">Dobara na dikhayein</label>
+    </div>
+    <div class="lead-btns">
+      <button class="lead-skip" id="leadSkip" type="button">Skip</button>
+      <button class="lead-submit" id="leadSubmit" type="button">Submit</button>
+    </div>
+  </div>
+</div>
+
 
 <div class="page-wrap">
   <div class="ad-rail">
@@ -945,6 +1007,87 @@ buildCards();
   restartLive();
   tickClock();
   setInterval(tickClock, 1000);
+})();
+
+// ---- Visitor lead popup ----
+(function(){
+  const LEADS_API = '/.netlify/functions/leads';
+  const SEEN_AT_KEY = 'gc_lead_seen_at';
+  const NEVER_KEY = 'gc_lead_never';
+  const SHOW_AGAIN_AFTER_MS = 15 * 24 * 60 * 60 * 1000; // 15 days
+
+  const overlay = document.getElementById('leadOverlay');
+  const nameInput = document.getElementById('leadName');
+  const phoneInput = document.getElementById('leadPhone');
+  const neverCheckbox = document.getElementById('leadNeverShow');
+  const errEl = document.getElementById('leadErr');
+  const submitBtn = document.getElementById('leadSubmit');
+  const skipBtn = document.getElementById('leadSkip');
+  const closeBtn = document.getElementById('leadClose');
+
+  function hidePopup(){
+    overlay.classList.remove('show');
+    if(neverCheckbox.checked){
+      localStorage.setItem(NEVER_KEY, '1');
+    } else {
+      localStorage.setItem(SEEN_AT_KEY, String(Date.now()));
+    }
+  }
+
+  function showPopup(){
+    overlay.classList.add('show');
+  }
+
+  async function submitLead(){
+    const name = nameInput.value.trim();
+    const phone = phoneInput.value.trim();
+
+    if(!name){
+      errEl.textContent = 'Naam likhein.';
+      nameInput.focus();
+      return;
+    }
+    if(!phone || phone.replace(/\D/g,'').length < 7){
+      errEl.textContent = 'Sahi mobile number likhein.';
+      phoneInput.focus();
+      return;
+    }
+    errEl.textContent = '';
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Bhej rahe hain...';
+
+    try {
+      await fetch(LEADS_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, phone, page: location.pathname })
+      });
+    } catch(err){
+      // silently ignore network errors — don't block the visitor
+    }
+
+    hidePopup();
+  }
+
+  skipBtn.addEventListener('click', hidePopup);
+  closeBtn.addEventListener('click', hidePopup);
+  submitBtn.addEventListener('click', submitLead);
+  overlay.addEventListener('click', function(e){
+    if(e.target === overlay) hidePopup();
+  });
+  [nameInput, phoneInput].forEach(function(el){
+    el.addEventListener('keydown', function(e){
+      if(e.key === 'Enter') submitLead();
+    });
+  });
+
+  const neverShow = localStorage.getItem(NEVER_KEY) === '1';
+  const lastSeenAt = parseInt(localStorage.getItem(SEEN_AT_KEY) || '0', 10);
+  const dueAgain = !lastSeenAt || (Date.now() - lastSeenAt) >= SHOW_AGAIN_AFTER_MS;
+
+  if(!neverShow && dueAgain){
+    setTimeout(showPopup, 1200);
+  }
 })();
 </script>
 

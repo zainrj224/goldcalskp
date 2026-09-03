@@ -153,6 +153,15 @@
       <div class="current-rate">Total Bill Amount: <b id="calcTotal">--</b></div>
     </div>
 
+    <div class="admin-card" id="leadsCard">
+      <h1>Visitor Leads</h1>
+      <div class="sub">Pop-up ke zariye jama hone wale naam aur mobile numbers</div>
+      <div id="leadsList" style="font-size:13px;color:var(--muted);">Loading...</div>
+      <hr class="divider">
+      <button onclick="refreshLeads()" style="background:var(--card2);color:var(--text);border:1px solid var(--border);">Refresh</button>
+      <button onclick="clearLeads()" style="background:var(--red);color:#fff;margin-top:10px;">Clear All Leads</button>
+    </div>
+
   </div>
 
   <a class="back-link" href="index.html">← Back to Live Board</a>
@@ -183,6 +192,7 @@
       sessionStorage.setItem('gc_admin_ok', '1');
       sessionStorage.setItem('gc_admin_entered_pass', entered);
       showRateCard();
+      refreshLeads();
     } else {
       msg.textContent = 'Galat passcode. Dobara koshish karein.';
       msg.className = 'status-msg err';
@@ -305,10 +315,73 @@
     }
   }
 
+  // ---- Visitor leads ----
+  const LEADS_API = '/.netlify/functions/leads';
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+    });
+  }
+
+  async function refreshLeads(){
+    const el = document.getElementById('leadsList');
+    const pass = enteredPass || sessionStorage.getItem('gc_admin_entered_pass') || '';
+    el.textContent = 'Loading...';
+
+    try {
+      const res = await fetch(LEADS_API, { headers: { 'x-admin-pass': pass } });
+      if(res.status === 401){
+        el.textContent = 'Session expired — dobara login karein.';
+        backToLogin();
+        return;
+      }
+      if(!res.ok){
+        el.textContent = 'Leads load nahi ho sake.';
+        return;
+      }
+      const data = await res.json();
+      const leads = data.leads || [];
+
+      if(leads.length === 0){
+        el.textContent = 'Abhi tak koi lead nahi hai.';
+        return;
+      }
+
+      el.innerHTML = '<div style="max-height:320px;overflow-y:auto;">' +
+        leads.map(function(l){
+          const d = new Date(l.createdAt);
+          return '<div style="padding:10px 0;border-bottom:1px solid var(--border);">' +
+            '<div style="color:var(--text);font-weight:700;">' + escapeHtml(l.name) + '</div>' +
+            '<div>' + escapeHtml(l.phone) + '</div>' +
+            '<div style="font-size:11px;">' + d.toLocaleString('en-PK') + '</div>' +
+            '</div>';
+        }).join('') + '</div>';
+    } catch(err){
+      el.textContent = 'Network error — leads load nahi ho sake.';
+    }
+  }
+
+  async function clearLeads(){
+    if(!confirm('Kya aap sach mein saari leads delete karna chahte hain?')) return;
+    const pass = enteredPass || sessionStorage.getItem('gc_admin_entered_pass') || '';
+    try {
+      const res = await fetch(LEADS_API, { method: 'DELETE', headers: { 'x-admin-pass': pass } });
+      if(res.status === 401){
+        backToLogin();
+        return;
+      }
+      refreshLeads();
+    } catch(err){
+      alert('Delete nahi ho saka — dobara koshish karein.');
+    }
+  }
+
   // auto-login if already logged in this session
   if(sessionStorage.getItem('gc_admin_ok') === '1'){
     enteredPass = sessionStorage.getItem('gc_admin_entered_pass') || null;
     showRateCard();
+    refreshLeads();
   }
 </script>
 </body>
