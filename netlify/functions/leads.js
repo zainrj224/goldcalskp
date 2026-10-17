@@ -16,6 +16,11 @@ function json(statusCode, body, extraHeaders) {
   };
 }
 
+// Stable key for a lead. New leads have an id; older ones fall back to createdAt + phone.
+function leadKey(l) {
+  return l.id || (String(l.createdAt) + '_' + l.phone);
+}
+
 function getBlobsStore() {
   // Same fallback pattern as rate.js — see that file for why this exists.
   const siteID = process.env.BLOBS_SITE_ID;
@@ -45,7 +50,8 @@ exports.handler = async (event) => {
       } catch (err) {
         leads = null;
       }
-      return json(200, { leads: leads || [] });
+      const list = (Array.isArray(leads) ? leads : []).map((l) => ({ ...l, id: leadKey(l) }));
+      return json(200, { leads: list });
     }
 
     if (event.httpMethod === 'POST') {
@@ -72,6 +78,7 @@ exports.handler = async (event) => {
       if (!Array.isArray(leads)) leads = [];
 
       leads.unshift({
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
         name,
         phone,
         page: (payload.page || '').toString().slice(0, 200),
@@ -93,6 +100,23 @@ exports.handler = async (event) => {
         return json(401, { error: 'Unauthorized' });
       }
 
+      const id = event.queryStringParameters && event.queryStringParameters.id;
+
+      // Delete a single lead
+      if (id) {
+        let leads;
+        try {
+          leads = await store.get(KEY, { type: 'json' });
+        } catch (err) {
+          leads = null;
+        }
+        if (!Array.isArray(leads)) leads = [];
+        const remaining = leads.filter((l) => leadKey(l) !== id);
+        await store.setJSON(KEY, remaining);
+        return json(200, { ok: true, deleted: leads.length - remaining.length });
+      }
+
+      // No id: clear all leads
       await store.setJSON(KEY, []);
       return json(200, { ok: true });
     }

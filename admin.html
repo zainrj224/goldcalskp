@@ -69,6 +69,11 @@
     font-size:13px;text-decoration:none;
   }
   .back-link:hover{color:var(--gold-bright);}
+  .admin-card button.lead-del{
+    width:auto;margin:0;padding:7px 12px;font-size:12px;flex-shrink:0;
+    background:transparent;color:var(--red);border:1px solid var(--red);
+  }
+  .admin-card button.lead-del:hover{background:var(--red);color:#fff;}
   .divider{border:none;border-top:1px solid var(--border);margin:22px 0;}
 </style>
 </head>
@@ -351,14 +356,37 @@
       el.innerHTML = '<div style="max-height:320px;overflow-y:auto;">' +
         leads.map(function(l){
           const d = new Date(l.createdAt);
-          return '<div style="padding:10px 0;border-bottom:1px solid var(--border);">' +
-            '<div style="color:var(--text);font-weight:700;">' + escapeHtml(l.name) + '</div>' +
-            '<div>' + escapeHtml(l.phone) + '</div>' +
-            '<div style="font-size:11px;">' + d.toLocaleString('en-PK') + '</div>' +
+          return '<div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;">' +
+            '<div>' +
+              '<div style="color:var(--text);font-weight:700;">' + escapeHtml(l.name) + '</div>' +
+              '<div>' + escapeHtml(l.phone) + '</div>' +
+              '<div style="font-size:11px;">' + d.toLocaleString('en-PK') + '</div>' +
+            '</div>' +
+            '<button class="lead-del" data-id="' + escapeHtml(l.id) + '" onclick="deleteLead(this.dataset.id)">Delete</button>' +
             '</div>';
         }).join('') + '</div>';
     } catch(err){
       el.textContent = 'Network error — leads load nahi ho sake.';
+    }
+  }
+
+  async function deleteLead(id){
+    if(!id) return;
+    if(!confirm('Kya aap yeh lead delete karna chahte hain?')) return;
+    const pass = enteredPass || sessionStorage.getItem('gc_admin_entered_pass') || '';
+    try {
+      const res = await fetch(LEADS_API + '?id=' + encodeURIComponent(id), { method: 'DELETE', headers: { 'x-admin-pass': pass } });
+      if(res.status === 401){
+        backToLogin();
+        return;
+      }
+      if(!res.ok){
+        alert('Delete nahi ho saka — dobara koshish karein.');
+        return;
+      }
+      refreshLeads();
+    } catch(err){
+      alert('Delete nahi ho saka — dobara koshish karein.');
     }
   }
 
