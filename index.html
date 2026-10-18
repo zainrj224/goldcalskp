@@ -664,7 +664,7 @@
       <input type="text" id="tolaRate21Disp" readonly placeholder="Upar se aayega">
     </div>
     <div class="box">
-      <label>2. Per Gram Gold Rate (24K)</label>
+      <label>2. Per Gram Gold Rate (21K)</label>
       <input type="text" id="gramRate" readonly placeholder="Auto Calculated">
     </div>
     <div class="box">
@@ -672,7 +672,7 @@
       <input type="text" id="mashaMakingDisp" readonly placeholder="Upar se aayega">
     </div>
     <div class="box">
-      <label>4. Per Gram Making Cost (24K)</label>
+      <label>4. Per Gram Making Cost (21K)</label>
       <input type="text" id="gramMaking" readonly placeholder="Auto Calculated">
     </div>
   </div>
@@ -922,14 +922,15 @@ function buildTicker(){
 
 function updateCalculator(){
   const base = getBase();
+  const base21 = karatValue(base, 21);   // everything in this calculator is shown for 21K
   const masha = getMasha();
-  document.getElementById('tolaRate21Disp').value = base>0 ? fmt(karatValue(base,21)) : '';
+  document.getElementById('tolaRate21Disp').value = base21>0 ? fmt(base21) : '';
   document.getElementById('mashaMakingDisp').value = masha>0 ? masha : '';
 
-  const gramRate = base / GRAM_PER_TOLA;
+  const gramRate = base21 / GRAM_PER_TOLA;
   document.getElementById('gramRate').value = gramRate>0 ? fmt2(gramRate) : '';
 
-  const tolaMakingCost = base * (masha/12);
+  const tolaMakingCost = base21 * (masha/12);
   const gramMaking = tolaMakingCost / GRAM_PER_TOLA;
   document.getElementById('gramMaking').value = gramMaking>0 ? fmt2(gramMaking) : '';
 }
