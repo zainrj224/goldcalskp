@@ -41,6 +41,8 @@
   .admin-card label:first-of-type{margin-top:0;}
   .admin-card input[type="number"],
   .admin-card input[type="password"],
+  .admin-card input[type="text"],
+  .admin-card input[type="date"],
   .admin-card select{
     width:100%;background:var(--card2);border:1px solid var(--border);color:var(--text);
     border-radius:8px;padding:12px 14px;font-size:16px;font-weight:600;
@@ -79,6 +81,40 @@
     vertical-align:middle;margin-left:6px;letter-spacing:.2px;
   }
   .src-badge.wa{background:#25d366;color:#06310f;}
+  .inv-row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .admin-card button.print-btn{background:#1c2833;color:#fff;margin-top:16px;}
+  .admin-card button.print-btn:hover{background:#000;color:#fff;}
+
+  /* ---- printable invoice (A4, merchant + customer copy) ---- */
+  #printArea{display:none;}
+  .inv-sheet{
+    width:210mm;height:296mm;padding:10mm;box-sizing:border-box;
+    display:flex;flex-direction:column;
+    font-family:Verdana,'Segoe UI',Tahoma,sans-serif;color:#1c2833;background:#fff;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact;
+  }
+  .inv-copy{
+    flex:1;border:1px solid #d5d9de;border-radius:6px;padding:8mm 8mm 6mm;
+    display:flex;flex-direction:column;box-sizing:border-box;
+  }
+  .inv-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #b8860b;padding-bottom:3mm;}
+  .inv-shop{font-size:21px;font-weight:800;letter-spacing:.3px;}
+  .inv-sub{font-size:10px;color:#5d6d7e;margin-top:2px;}
+  .inv-badge{background:#fff3b0;border:1px solid #f0dc7a;color:#a67c00;font-weight:800;font-size:13px;letter-spacing:.08em;padding:5px 14px;border-radius:4px;white-space:nowrap;}
+  .inv-meta{display:flex;justify-content:space-between;background:#f4f6f8;padding:7px 9px;margin:4mm 0 3mm;font-size:11px;font-weight:700;color:#34495e;gap:8px;}
+  .inv-row{display:flex;justify-content:space-between;font-size:12px;font-weight:700;padding:7px 4px;border-bottom:1px dotted #d5d9de;}
+  .inv-total{display:flex;justify-content:space-between;font-size:16px;font-weight:800;padding:9px 4px;border-top:1.5px solid #1c2833;border-bottom:1.5px solid #1c2833;margin-top:2px;}
+  .inv-spacer{flex:1;}
+  .inv-sign{display:flex;justify-content:space-between;gap:30mm;}
+  .inv-sign div{flex:1;border-top:1px solid #1c2833;padding-top:4px;text-align:center;font-size:10px;font-weight:700;color:#34495e;}
+  .inv-cut{display:flex;align-items:center;gap:8px;height:10mm;font-size:10px;color:#5d6d7e;}
+  .inv-cut i{flex:1;border-top:1px dashed #9aa5b1;}
+  @media print{
+    @page{size:A4;margin:0;}
+    html,body{background:#fff !important;margin:0 !important;padding:0 !important;}
+    body > *:not(#printArea){display:none !important;}
+    #printArea{display:block !important;}
+  }
   .divider{border:none;border-top:1px solid var(--border);margin:22px 0;}
 </style>
 </head>
@@ -177,6 +213,25 @@
       <div class="current-rate">Gold Value: <b id="calcGoldValue">--</b></div>
       <div class="current-rate">Making Charges: <b id="calcMakingCost">--</b></div>
       <div class="current-rate">Total Bill Amount: <b id="calcTotal">--</b></div>
+
+      <hr class="divider">
+
+      <label for="invCustomer">Customer Name (invoice ke liye)</label>
+      <input type="text" id="invCustomer" placeholder="Customer ka naam" autocomplete="off">
+
+      <div class="inv-row2">
+        <div>
+          <label for="invNo">Invoice #</label>
+          <input type="text" id="invNo" autocomplete="off">
+        </div>
+        <div>
+          <label for="invDate">Date</label>
+          <input type="date" id="invDate">
+        </div>
+      </div>
+
+      <button class="print-btn" onclick="printInvoice()">🖨 Print Invoice (A4 — Merchant + Customer Copy)</button>
+      <div class="status-msg" id="invMsg"></div>
     </div>
 
     <div class="admin-card" id="leadsCard">
@@ -192,6 +247,8 @@
 
   <a class="back-link" href="index.html">← Back to Live Board</a>
 </div>
+
+<div id="printArea"></div>
 
 <script>
   const RATE_API = '/.netlify/functions/rate';
@@ -268,6 +325,7 @@
 
     // pre-fill the fast calculator with the current live values
     document.getElementById('calcMasha').value = masha;
+    initInvoiceFields();
     runBillCalc();
   }
 
@@ -284,14 +342,116 @@
     const P = parseFloat(document.getElementById('calcWeight').value) || 0;
 
     const gramRate = pT / GRAM_PER_TOLA;
-    const goldValue = P * gramRate;
-    const makingCost = (P / GRAM_PER_TOLA) * (M / GRAM_PER_TOLA) * pT;
+    // round each line to whole rupees so the total always equals the sum of the printed lines
+    const goldValue = Math.round(P * gramRate);
+    const makingCost = Math.round((P / GRAM_PER_TOLA) * (M / GRAM_PER_TOLA) * pT);
     const total = goldValue + makingCost;
 
     document.getElementById('calcGramRate').textContent = gramRate>0 ? fmt2(gramRate) + ' PKR' : '--';
     document.getElementById('calcGoldValue').textContent = goldValue>0 ? fmt2(goldValue) + ' PKR' : '--';
     document.getElementById('calcMakingCost').textContent = makingCost>0 ? fmt2(makingCost) + ' PKR' : '--';
     document.getElementById('calcTotal').textContent = total>0 ? fmt2(total) + ' PKR' : '--';
+  }
+
+  // ---- Print invoice (A4: merchant copy on top, customer copy below) ----
+  const SHOP_NAME = 'Rajput Jewelers';
+  const SHOP_ADDRESS = 'Sheikhupura';
+  const SHOP_PHONE = '0309-8092475';
+  const INVOICE_KEY = 'gc_last_invoice_no';
+
+  function todayISO(){
+    const d = new Date();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+
+  function nextInvoiceNo(){
+    let last = 0;
+    try { last = parseInt(localStorage.getItem(INVOICE_KEY) || '0', 10) || 0; } catch(e) {}
+    return String(last + 1).padStart(5, '0');
+  }
+
+  function initInvoiceFields(){
+    const no = document.getElementById('invNo');
+    const dt = document.getElementById('invDate');
+    if(!no.value) no.value = nextInvoiceNo();
+    if(!dt.value) dt.value = todayISO();
+  }
+
+  function fmtDate(iso){
+    const p = (iso || '').split('-');
+    return p.length === 3 ? (p[2] + '/' + p[1] + '/' + p[0]) : (iso || '');
+  }
+
+  function rs(n){ return 'Rs. ' + n.toLocaleString('en-PK', {maximumFractionDigits:0}); }
+
+  function invoiceCopy(label, d){
+    return '<div class="inv-copy">' +
+      '<div class="inv-head">' +
+        '<div><div class="inv-shop">👑 ' + escapeHtml(SHOP_NAME) + '</div>' +
+        '<div class="inv-sub">' + escapeHtml(SHOP_ADDRESS) + ' | Phone: ' + escapeHtml(SHOP_PHONE) + '</div></div>' +
+        '<div class="inv-badge">' + label + '</div>' +
+      '</div>' +
+      '<div class="inv-meta"><span>Customer: ' + escapeHtml(d.customer || '________________') + '</span>' +
+        '<span>Invoice: #' + escapeHtml(d.invNo) + '</span><span>Date: ' + escapeHtml(d.date) + '</span></div>' +
+      '<div class="inv-row"><span>Gold Rate ' + d.karat + 'K (Per Tola):</span><span>' + rs(d.pT) + '</span></div>' +
+      '<div class="inv-row"><span>Gold Rate (Per Gram):</span><span>Rs. ' + d.gramRate.toLocaleString('en-PK', {maximumFractionDigits:2}) + '</span></div>' +
+      '<div class="inv-row"><span>Product Weight:</span><span>' + d.weight.toLocaleString('en-PK', {maximumFractionDigits:3}) + ' gms</span></div>' +
+      '<div class="inv-row"><span>Gold Price:</span><span>' + rs(d.goldValue) + '</span></div>' +
+      '<div class="inv-row"><span>Making Charges:</span><span>' + rs(d.makingCost) + '</span></div>' +
+      '<div class="inv-total"><span>TOTAL PRICE:</span><span>' + rs(d.total) + '</span></div>' +
+      '<div class="inv-spacer"></div>' +
+      '<div class="inv-sign"><div>Customer Signature</div><div>Merchant Signature</div></div>' +
+    '</div>';
+  }
+
+  function printInvoice(){
+    const msg = document.getElementById('invMsg');
+    const karat = parseInt(document.getElementById('calcKarat').value, 10) || 24;
+    const base = parseFloat(document.getElementById('rateInput').value) || 0;
+    const M = parseFloat(document.getElementById('calcMasha').value) || 0;
+    const P = parseFloat(document.getElementById('calcWeight').value) || 0;
+    if(!(base > 0) || !(P > 0)){
+      msg.textContent = 'Pehle product weight daalein — phir invoice print karein.';
+      msg.className = 'status-msg err';
+      return;
+    }
+
+    const pT = base * (karat / 24);
+    const gramRate = pT / GRAM_PER_TOLA;
+    const goldValue = Math.round(P * gramRate);
+    const makingCost = Math.round((P / GRAM_PER_TOLA) * (M / GRAM_PER_TOLA) * pT);
+    const invNo = document.getElementById('invNo').value.trim() || nextInvoiceNo();
+
+    const data = {
+      customer: document.getElementById('invCustomer').value.trim(),
+      invNo: invNo,
+      date: fmtDate(document.getElementById('invDate').value || todayISO()),
+      karat: karat,
+      pT: Math.round(pT),
+      gramRate: gramRate,
+      weight: P,
+      goldValue: goldValue,
+      makingCost: makingCost,
+      total: goldValue + makingCost
+    };
+
+    document.getElementById('printArea').innerHTML =
+      '<div class="inv-sheet">' +
+        invoiceCopy('MERCHANT COPY', data) +
+        '<div class="inv-cut"><i></i><span>✂ Cut Here ✂</span><i></i></div>' +
+        invoiceCopy('CUSTOMER COPY', data) +
+      '</div>';
+
+    // remember the number and get the next one ready
+    try {
+      const n = parseInt(invNo.replace(/\D/g, ''), 10);
+      if(isFinite(n)) localStorage.setItem(INVOICE_KEY, String(n));
+    } catch(e) {}
+    msg.textContent = '';
+    window.print();
+    document.getElementById('invNo').value = nextInvoiceNo();
   }
 
   async function saveAll(){
