@@ -74,6 +74,11 @@
     background:transparent;color:var(--red);border:1px solid var(--red);
   }
   .admin-card button.lead-del:hover{background:var(--red);color:#fff;}
+  .src-badge{
+    display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;
+    vertical-align:middle;margin-left:6px;letter-spacing:.2px;
+  }
+  .src-badge.wa{background:#25d366;color:#06310f;}
   .divider{border:none;border-top:1px solid var(--border);margin:22px 0;}
 </style>
 </head>
@@ -103,6 +108,15 @@
       <div class="current-rate">Current Rate: <b id="currentRateDisp">--</b> PKR / Tola</div>
       <label for="rateInput">Base Rate — Per Tola 24K (PKR)</label>
       <input type="number" id="rateInput" placeholder="e.g. 450000">
+    </div>
+
+    <div class="admin-card">
+      <h1>Silver Rate</h1>
+      <div class="sub">Silver ka rate yahan daalein — live board par silver section dikhega</div>
+      <div class="current-rate">Current Silver Rate: <b id="currentSilverDisp">--</b> PKR / Tola</div>
+      <label for="silverInput">Silver Rate — Per Tola (PKR)</label>
+      <input type="number" id="silverInput" placeholder="e.g. 6500">
+      <small>0 ya khali chhorein to silver section board se hide ho jayega. "Save All Settings" dabane par save hoga.</small>
     </div>
 
     <div class="admin-card">
@@ -160,7 +174,7 @@
 
     <div class="admin-card" id="leadsCard">
       <h1>Visitor Leads</h1>
-      <div class="sub">Pop-up ke zariye jama hone wale naam aur mobile numbers</div>
+      <div class="sub">Pop-up aur WhatsApp Quotation ke zariye jama hone wale naam aur mobile numbers</div>
       <div id="leadsList" style="font-size:13px;color:var(--muted);">Loading...</div>
       <hr class="divider">
       <button onclick="refreshLeads()" style="background:var(--card2);color:var(--text);border:1px solid var(--border);">Refresh</button>
@@ -230,6 +244,10 @@
     document.getElementById('currentRateDisp').textContent = fmt(rate);
     document.getElementById('rateInput').value = rate;
 
+    const silver = (settings && isFinite(settings.silver) && settings.silver > 0) ? settings.silver : 0;
+    document.getElementById('currentSilverDisp').textContent = silver > 0 ? fmt(silver) : 'Not set';
+    document.getElementById('silverInput').value = silver > 0 ? silver : '';
+
     const masha = (settings && isFinite(settings.masha) && settings.masha >= 0) ? settings.masha : DEFAULT_MASHA;
     document.getElementById('mashaInput').value = masha;
 
@@ -269,6 +287,8 @@
 
   async function saveAll(){
     const rate = parseFloat(document.getElementById('rateInput').value);
+    const silverRaw = document.getElementById('silverInput').value.trim();
+    const silver = silverRaw === '' ? 0 : parseFloat(silverRaw);
     const masha = parseFloat(document.getElementById('mashaInput').value);
     const vol = document.getElementById('volInput').value;
     const live = document.getElementById('liveInput').checked;
@@ -277,6 +297,11 @@
 
     if(!isFinite(rate) || rate <= 0){
       msg.textContent = 'Sahi base rate daalein.';
+      msg.className = 'status-msg err';
+      return;
+    }
+    if(!isFinite(silver) || silver < 0){
+      msg.textContent = 'Sahi silver rate daalein (ya 0 chhor dein).';
       msg.className = 'status-msg err';
       return;
     }
@@ -295,7 +320,7 @@
           'Content-Type': 'application/json',
           'x-admin-pass': pass
         },
-        body: JSON.stringify({ rate, masha, vol, live, spot })
+        body: JSON.stringify({ rate, silver, masha, vol, live, spot })
       });
 
       if(res.status === 401){
@@ -312,6 +337,7 @@
       }
 
       document.getElementById('currentRateDisp').textContent = fmt(rate);
+      document.getElementById('currentSilverDisp').textContent = silver > 0 ? fmt(silver) : 'Not set';
       msg.textContent = 'Settings save ho gayi — Live Board update ho jayega.';
       msg.className = 'status-msg ok';
     } catch(err){
@@ -358,8 +384,10 @@
           const d = new Date(l.createdAt);
           return '<div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;">' +
             '<div>' +
-              '<div style="color:var(--text);font-weight:700;">' + escapeHtml(l.name) + '</div>' +
+              '<div style="color:var(--text);font-weight:700;">' + escapeHtml(l.name) +
+                (l.source === 'whatsapp' ? ' <span class="src-badge wa">WhatsApp Quotation</span>' : '') + '</div>' +
               '<div>' + escapeHtml(l.phone) + '</div>' +
+              (l.note ? '<div style="font-size:12px;">' + escapeHtml(l.note) + '</div>' : '') +
               '<div style="font-size:11px;">' + d.toLocaleString('en-PK') + '</div>' +
             '</div>' +
             '<button class="lead-del" data-id="' + escapeHtml(l.id) + '" onclick="deleteLead(this.dataset.id)">Delete</button>' +

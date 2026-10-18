@@ -62,8 +62,13 @@ exports.handler = async (event) => {
         return json(400, { error: 'Invalid JSON body' });
       }
 
-      const name = (payload.name || '').toString().trim().slice(0, 100);
+      const source = payload.source === 'whatsapp' ? 'whatsapp' : 'popup';
+      let name = (payload.name || '').toString().trim().slice(0, 100);
       const phone = (payload.phone || '').toString().trim().slice(0, 30);
+      const note = (payload.note || '').toString().trim().slice(0, 400);
+
+      // WhatsApp quotation requests only strictly need the phone number
+      if (!name && source === 'whatsapp') name = 'WhatsApp Visitor';
 
       if (!name || !phone) {
         return json(400, { error: 'Name and phone are required' });
@@ -81,6 +86,8 @@ exports.handler = async (event) => {
         id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
         name,
         phone,
+        source,
+        note,
         page: (payload.page || '').toString().slice(0, 200),
         createdAt: Date.now()
       });

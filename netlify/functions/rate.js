@@ -5,6 +5,7 @@ const KEY = 'settings';
 
 const DEFAULTS = {
   rate: 450000,
+  silver: 0,
   masha: 2,
   vol: '200',
   live: true,
@@ -73,6 +74,24 @@ exports.handler = async (event) => {
       const rate = parseFloat(payload.rate);
       const masha = parseFloat(payload.masha);
 
+      // Silver rate per tola (PKR). 0 = not set / hide silver on the board.
+      // If the client doesn't send it, keep whatever was saved before.
+      let silver;
+      if (payload.silver === undefined || payload.silver === null || payload.silver === '') {
+        let prev = null;
+        try {
+          prev = await store.get(KEY, { type: 'json' });
+        } catch (err) {
+          prev = null;
+        }
+        silver = prev && isFinite(prev.silver) && prev.silver > 0 ? prev.silver : 0;
+      } else {
+        silver = parseFloat(payload.silver);
+        if (!isFinite(silver) || silver < 0) {
+          return json(400, { error: 'Invalid silver rate' });
+        }
+      }
+
       if (!isFinite(rate) || rate <= 0) {
         return json(400, { error: 'Invalid rate' });
       }
@@ -82,6 +101,7 @@ exports.handler = async (event) => {
 
       const settings = {
         rate,
+        silver,
         masha,
         vol: payload.vol != null ? String(payload.vol) : DEFAULTS.vol,
         live: !!payload.live,

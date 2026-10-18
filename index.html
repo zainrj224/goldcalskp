@@ -224,6 +224,49 @@
   .wg-row span{font-size:11px;color:var(--muted);}
   .wg-row b{font-size:16px;color:var(--gold-bright);}
 
+  /* ---- silver rate card ---- */
+  .silver-wrap{max-width:1200px;margin:0 auto 18px auto;}
+  .silver-card{
+    background:linear-gradient(120deg,var(--card) 60%,var(--card2) 100%);
+    border:1px solid #aab0ba;
+    border-radius:14px;padding:22px 26px;
+    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;
+  }
+  .silver-card .silver-badge{
+    display:inline-block;background:#aab0ba;color:#141416;
+    font-size:10px;font-weight:800;letter-spacing:.06em;
+    padding:3px 9px;border-radius:5px;margin-bottom:8px;
+  }
+  .silver-card h3{margin:0 0 4px;font-size:19px;color:var(--text);}
+  .silver-card .silver-sub{font-size:12px;color:var(--muted);}
+  .silver-card .silver-right{text-align:right;}
+  .silver-card .silver-label{font-size:11px;color:var(--muted);margin-bottom:4px;}
+  .silver-card .silver-val{font-size:30px;font-weight:800;color:var(--text);line-height:1.1;transition:color .3s;}
+  .silver-card .silver-unit{font-size:11px;color:var(--muted);margin-top:2px;}
+  .silver-card .delta{margin:4px 0 0 0;}
+  .silver-card .sub-rates{flex-basis:100%;grid-template-columns:repeat(3,1fr);}
+  @media (max-width:640px){
+    .silver-card{padding:18px;}
+    .silver-card .silver-right{text-align:left;}
+    .silver-card .silver-val{font-size:26px;}
+  }
+
+  /* ---- WhatsApp quotation button ---- */
+  .wa-quote-row{margin-top:18px;text-align:center;}
+  .wa-btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:10px;
+    background:#25d366;color:#06310f;border:none;border-radius:10px;
+    padding:14px 26px;font-size:16px;font-weight:800;cursor:pointer;
+    box-shadow:0 6px 16px rgba(37,211,102,.28);transition:transform .15s, background .15s;
+    max-width:100%;
+  }
+  .wa-btn:hover{background:#1fbd5b;transform:translateY(-1px);}
+  .wa-btn svg{width:22px;height:22px;flex-shrink:0;}
+  .wa-hint{font-size:11px;color:var(--muted);margin-top:8px;min-height:15px;}
+  .wa-hint.err{color:var(--red);font-weight:600;}
+  .wa-change{background:none;border:none;color:var(--muted);font-size:11px;text-decoration:underline;cursor:pointer;padding:0;margin-left:4px;}
+  .wa-change:hover{color:var(--text);}
+
   /* ---- ticker ---- */
   .ticker-wrap{
     max-width:1200px;margin:0 auto 18px auto;
@@ -517,6 +560,23 @@
 </div>
 
 <!-- Controls are now admin-only (set via admin.html). Kept hidden in the DOM so the page logic keeps working. -->
+<div class="lead-overlay" id="waOverlay">
+  <div class="lead-modal">
+    <button class="lead-close" id="waClose" aria-label="Close">&times;</button>
+    <h3>WhatsApp par Quotation 💬</h3>
+    <p class="lead-sub">Apna mobile number likhein — hum aapko WhatsApp par quotation bhejenge. Aapka number humein share ho jayega taake hum aap se rabta kar saken.</p>
+    <label for="waName">Naam (optional)</label>
+    <input type="text" id="waName" placeholder="Aapka naam" autocomplete="name">
+    <label for="waPhone">Mobile Number</label>
+    <input type="tel" id="waPhone" placeholder="03xx-xxxxxxx" autocomplete="tel">
+    <div class="lead-err" id="waErr"></div>
+    <div class="lead-btns">
+      <button class="lead-skip" id="waCancel" type="button">Cancel</button>
+      <button class="lead-submit" id="waSubmit" type="button">WhatsApp Kholein</button>
+    </div>
+  </div>
+</div>
+
 <div class="controls" style="display:none;">
   <div class="field">
     <label for="baseTola">Base Rate — Per Tola 24K (PKR)</label>
@@ -567,6 +627,27 @@
 
 <div class="ticker-wrap">
   <div class="ticker" id="tickerRow"></div>
+</div>
+
+<div class="silver-wrap" id="silverWrap" style="display:none;">
+  <div class="silver-card">
+    <div class="silver-left">
+      <div class="silver-badge">SILVER</div>
+      <h3>Silver — Live Rate</h3>
+      <div class="silver-sub">Rajput Jewelers — Sheikhupura</div>
+    </div>
+    <div class="silver-right">
+      <div class="silver-label">Today's Silver Rate (Tola)</div>
+      <div class="silver-val" id="silverVal">--</div>
+      <div class="delta" id="silverDelta"></div>
+      <div class="silver-unit">PKR</div>
+    </div>
+    <div class="sub-rates">
+      <div>Per Gram<b id="silverGram">--</b></div>
+      <div>Per 10 Gram<b id="silverTen">--</b></div>
+      <div>Per Kg<b id="silverKg">--</b></div>
+    </div>
+  </div>
 </div>
 
 <div class="calc-section">
@@ -642,6 +723,14 @@
     </div>
   </div>
   <div class="bill-formula">Formula: Making Cost = P × M × pT ÷ 11.664&nbsp;&nbsp;|&nbsp;&nbsp;P = product weight (grams), M = making grams/tola, pT = tola price of selected karat</div>
+
+  <div class="wa-quote-row">
+    <button type="button" class="wa-btn" id="waQuoteBtn">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.5 14.4c-.3-.15-1.75-.86-2.02-.96-.27-.1-.47-.15-.66.15-.2.3-.76.96-.93 1.15-.17.2-.34.22-.64.07-.3-.15-1.25-.46-2.38-1.47-.88-.78-1.47-1.75-1.64-2.05-.17-.3-.02-.46.13-.6.13-.13.3-.34.44-.51.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.08-.15-.66-1.6-.9-2.18-.24-.57-.48-.5-.66-.5h-.56c-.2 0-.52.07-.8.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.07 2.88 1.22 3.08.15.2 2.1 3.2 5.08 4.49.71.3 1.26.49 1.7.62.71.23 1.36.2 1.87.12.57-.09 1.75-.72 2-1.41.25-.7.25-1.29.17-1.41-.07-.12-.27-.2-.57-.35zM12.05 21.5h-.01a9.45 9.45 0 0 1-4.82-1.32l-.35-.2-3.58.94.96-3.49-.23-.36a9.43 9.43 0 0 1-1.45-5.03c0-5.2 4.24-9.44 9.46-9.44 2.52 0 4.9.98 6.68 2.77a9.37 9.37 0 0 1 2.76 6.68c0 5.21-4.24 9.45-9.42 9.45zM20.52 3.45A11.4 11.4 0 0 0 12.05 0C5.73 0 .59 5.14.59 11.45c0 2.02.53 3.99 1.53 5.73L.5 23.5l6.5-1.7a11.44 11.44 0 0 0 5.04 1.17h.01c6.32 0 11.46-5.14 11.46-11.46 0-3.06-1.19-5.94-3.35-8.1z" transform="translate(0 .25) scale(.98)"/></svg>
+      Get Quotation on WhatsApp
+    </button>
+    <div class="wa-hint" id="waQuoteHint">Weight daalein, phir apna quotation WhatsApp par bhejein.</div>
+  </div>
 </div>
 
 <div class="grid" id="cityGrid">
@@ -775,12 +864,56 @@ function renderCards(){
   });
 }
 
+// ---- Silver (admin-set rate per tola; flickers live just like gold) ----
+let silverState = 0;
+let prevSilver = 0;
+
+function getSilverBase(){
+  const v = latestAdminSettings ? parseFloat(latestAdminSettings.silver) : 0;
+  return (isFinite(v) && v > 0) ? v : 0;
+}
+
+function computeSilver(){
+  silverState = getSilverBase();
+}
+
+function renderSilver(){
+  const wrap = document.getElementById('silverWrap');
+  if(!wrap) return;
+  const val = silverState;
+  if(!(val > 0)){ wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+
+  const valEl = document.getElementById('silverVal');
+  const deltaEl = document.getElementById('silverDelta');
+  const gram = val / GRAM_PER_TOLA;
+  valEl.textContent = fmt(val);
+  document.getElementById('silverGram').textContent = fmt2(gram);
+  document.getElementById('silverTen').textContent = fmt2(gram * 10);
+  document.getElementById('silverKg').textContent = fmt(gram * 1000);
+
+  const diff = Math.round(val) - Math.round(prevSilver || val);
+  if(prevSilver > 0 && diff !== 0){
+    const up = diff > 0;
+    deltaEl.className = 'delta ' + (up ? 'up' : 'down');
+    deltaEl.textContent = (up ? '▲ ' : '▼ ') + fmt(Math.abs(diff)) + ' PKR';
+    valEl.style.color = up ? '#26c281' : '#e5484d';
+    setTimeout(()=>{ valEl.style.color = ''; }, 700);
+  } else {
+    deltaEl.className = 'delta';
+    deltaEl.textContent = '— No change';
+  }
+}
+
 function buildTicker(){
   const row = document.getElementById('tickerRow');
-  const items = CITIES.map(c=>{
+  let items = CITIES.map(c=>{
     const val = cityState[c.name] || 0;
     return `<span>${c.name}: <b>${val>0?fmt(val):'--'} PKR</b></span>`;
   }).join('');
+  if(silverState > 0){
+    items += `<span>Silver / Tola: <b>${fmt(silverState)} PKR</b></span>`;
+  }
   row.innerHTML = items + items; // duplicate for seamless scroll
 }
 
@@ -798,11 +931,9 @@ function updateCalculator(){
   document.getElementById('gramMaking').value = gramMaking>0 ? fmt2(gramMaking) : '';
 }
 
-function updateBill(){
+function getBillValues(){
   const karat = parseInt(document.getElementById('billKarat').value, 10) || 24;
   const pT = karatValue(getBase(), karat);   // tola price for the selected karat (from the 24K base rate)
-  const tolaNote = document.getElementById('billTolaPriceNote');
-  if(tolaNote) tolaNote.textContent = pT>0 ? ('1 Tola ' + karat + 'K price: ' + fmt(pT) + ' PKR') : 'Tola price: --';
   const M = parseFloat(document.getElementById('billMakingGrams').value) || 0;
   const P = parseFloat(document.getElementById('billProductWeight').value) || 0;
 
@@ -810,12 +941,19 @@ function updateBill(){
   const goldValue = P * gramRate;
   const makingCost = (P / GRAM_PER_TOLA) * (M / GRAM_PER_TOLA) * pT;
   const total = goldValue + makingCost;
+  return { karat, pT, M, P, gramRate, goldValue, makingCost, total };
+}
 
-  document.getElementById('billGramRate').textContent = gramRate>0 ? fmt2(gramRate) + ' PKR' : '--';
-  document.getElementById('billWeightDisp').textContent = P>0 ? fmt2(P) + ' g' : '--';
-  document.getElementById('billGoldValue').textContent = goldValue>0 ? fmt2(goldValue) + ' PKR' : '--';
-  document.getElementById('billMakingCost').textContent = makingCost>0 ? fmt2(makingCost) + ' PKR' : '--';
-  document.getElementById('billTotal').textContent = total>0 ? fmt2(total) + ' PKR' : '--';
+function updateBill(){
+  const b = getBillValues();
+  const tolaNote = document.getElementById('billTolaPriceNote');
+  if(tolaNote) tolaNote.textContent = b.pT>0 ? ('1 Tola ' + b.karat + 'K price: ' + fmt(b.pT) + ' PKR') : 'Tola price: --';
+
+  document.getElementById('billGramRate').textContent = b.gramRate>0 ? fmt2(b.gramRate) + ' PKR' : '--';
+  document.getElementById('billWeightDisp').textContent = b.P>0 ? fmt2(b.P) + ' g' : '--';
+  document.getElementById('billGoldValue').textContent = b.goldValue>0 ? fmt2(b.goldValue) + ' PKR' : '--';
+  document.getElementById('billMakingCost').textContent = b.makingCost>0 ? fmt2(b.makingCost) + ' PKR' : '--';
+  document.getElementById('billTotal').textContent = b.total>0 ? fmt2(b.total) + ' PKR' : '--';
 }
 
 
@@ -894,8 +1032,11 @@ function applyWorldGoldToggle(){
 
 function rebuild(){
   prevState = {...cityState};
+  prevSilver = silverState;
   computeCityRates();
+  computeSilver();
   renderCards();
+  renderSilver();
   buildTicker();
   updateCalculator();
   updateBill();
@@ -910,6 +1051,14 @@ function applyVolatility(){
     const jitter = (Math.random() - 0.5) * 2 * vol; // +/- vol PKR
     cityState[c.name] = Math.max(0, cityState[c.name] + jitter);
   });
+  if(silverState > 0){
+    // scale the gold volatility down to silver's price level (at least +/-1 PKR so it visibly moves)
+    const goldBase = getBase() || DEFAULT_TOLA_RATE;
+    const amp = Math.max(1, vol * (getSilverBase() / goldBase));
+    prevSilver = silverState;
+    silverState = Math.max(0, silverState + (Math.random() - 0.5) * 2 * amp);
+  }
+  renderSilver();
   renderCards();
   buildTicker();
   updateHomeBranch();
@@ -1007,7 +1156,9 @@ buildCards();
 (async function init(){
   await loadAdminSettings();
   computeCityRates();
+  computeSilver();
   renderCards();
+  renderSilver();
   buildTicker();
   updateCalculator();
   updateBill();
@@ -1062,6 +1213,7 @@ buildCards();
       return;
     }
     errEl.textContent = '';
+    try { localStorage.setItem('gc_visitor_contact', JSON.stringify({ name, phone })); } catch(e) {}
     submitBtn.disabled = true;
     submitBtn.textContent = 'Bhej rahe hain...';
 
@@ -1096,6 +1248,155 @@ buildCards();
 
   if(!neverShow && dueAgain){
     setTimeout(showPopup, 1200);
+  }
+})();
+
+// ---- WhatsApp quotation: logs the visitor's number as a lead, then opens WhatsApp ----
+(function(){
+  const LEADS_API = '/.netlify/functions/leads';
+  const WA_NUMBER = '923098092475';              // 0309-8092475 in international format
+  const CONTACT_KEY = 'gc_visitor_contact';
+
+  const btn = document.getElementById('waQuoteBtn');
+  const hintEl = document.getElementById('waQuoteHint');
+  const overlay = document.getElementById('waOverlay');
+  const nameInput = document.getElementById('waName');
+  const phoneInput = document.getElementById('waPhone');
+  const errEl = document.getElementById('waErr');
+  const submitBtn = document.getElementById('waSubmit');
+  const cancelBtn = document.getElementById('waCancel');
+  const closeBtn = document.getElementById('waClose');
+  const DEFAULT_HINT = hintEl.textContent;
+
+  function getContact(){
+    try {
+      const c = JSON.parse(localStorage.getItem(CONTACT_KEY) || 'null');
+      if(c && c.phone) return c;
+    } catch(e) {}
+    return null;
+  }
+  function saveContact(c){
+    try { localStorage.setItem(CONTACT_KEY, JSON.stringify(c)); } catch(e) {}
+  }
+  function clearContact(){
+    try { localStorage.removeItem(CONTACT_KEY); } catch(e) {}
+  }
+
+  function setHint(text, isErr){
+    hintEl.textContent = text;
+    hintEl.className = 'wa-hint' + (isErr ? ' err' : '');
+  }
+
+  function renderContactHint(){
+    const c = getContact();
+    if(!c){ setHint(DEFAULT_HINT, false); return; }
+    hintEl.className = 'wa-hint';
+    hintEl.textContent = 'Quotation is number par jayega: ' + c.phone + ' ';
+    const change = document.createElement('button');
+    change.type = 'button';
+    change.className = 'wa-change';
+    change.textContent = 'Number badlein';
+    change.addEventListener('click', function(){ clearContact(); renderContactHint(); openModal(); });
+    hintEl.appendChild(change);
+  }
+
+  function openModal(){
+    errEl.textContent = '';
+    overlay.classList.add('show');
+    setTimeout(function(){ phoneInput.focus(); }, 50);
+  }
+  function closeModal(){
+    overlay.classList.remove('show');
+  }
+
+  function money(n){ return n > 0 ? fmt(n) + ' PKR' : '--'; }
+
+  function buildMessage(q, contact){
+    return [
+      'Assalam o Alaikum Rajput Jewelers!',
+      'Mujhe yeh quotation chahiye:',
+      '',
+      'Karat: ' + q.karat + 'K',
+      'Weight: ' + fmt2(q.P) + ' g',
+      'Gold Rate (1 Tola, ' + q.karat + 'K): ' + money(q.pT),
+      'Gold Value: ' + money(q.goldValue),
+      'Making (' + q.M + ' g/tola): ' + money(q.makingCost),
+      'Total: ' + money(q.total),
+      '',
+      'Naam: ' + (contact.name || '-'),
+      'Mobile: ' + contact.phone
+    ].join('\n');
+  }
+
+  // Send the quotation request to the admin's Visitor Leads, then open WhatsApp.
+  // WhatsApp is opened immediately (inside the click) so mobile browsers don't block it.
+  function sendQuote(contact, q){
+    const note = q.karat + 'K · ' + fmt2(q.P) + ' g · Total ' + money(q.total);
+    try {
+      fetch(LEADS_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        keepalive: true,
+        body: JSON.stringify({
+          name: contact.name || '',
+          phone: contact.phone,
+          source: 'whatsapp',
+          note: note,
+          page: location.pathname
+        })
+      }).catch(function(){});
+    } catch(e) {}
+
+    const url = 'https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(buildMessage(q, contact));
+    const w = window.open(url, '_blank', 'noopener');
+    if(!w) location.href = url;
+  }
+
+  btn.addEventListener('click', function(){
+    const q = getBillValues();
+    if(!(q.P > 0)){
+      setHint('Pehle upar Product Weight (grams) daalein, phir quotation bhejein.', true);
+      document.getElementById('billProductWeight').focus();
+      return;
+    }
+    renderContactHint();
+    const c = getContact();
+    if(c){
+      sendQuote(c, q);
+    } else {
+      openModal();
+    }
+  });
+
+  function submitContact(){
+    const name = nameInput.value.trim();
+    const phone = phoneInput.value.trim();
+    if(!phone || phone.replace(/\D/g,'').length < 7){
+      errEl.textContent = 'Sahi mobile number likhein.';
+      phoneInput.focus();
+      return;
+    }
+    const contact = { name, phone };
+    saveContact(contact);
+    closeModal();
+    renderContactHint();
+    sendQuote(contact, getBillValues());
+  }
+
+  submitBtn.addEventListener('click', submitContact);
+  cancelBtn.addEventListener('click', closeModal);
+  closeBtn.addEventListener('click', closeModal);
+  overlay.addEventListener('click', function(e){ if(e.target === overlay) closeModal(); });
+  [nameInput, phoneInput].forEach(function(el){
+    el.addEventListener('keydown', function(e){ if(e.key === 'Enter') submitContact(); });
+  });
+
+  // pre-fill the modal with a number the visitor already gave in the welcome pop-up
+  const existing = getContact();
+  if(existing){
+    nameInput.value = existing.name || '';
+    phoneInput.value = existing.phone || '';
+    renderContactHint();
   }
 })();
 </script>
