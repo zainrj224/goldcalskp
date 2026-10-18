@@ -204,7 +204,8 @@
   .home-branch-card .hb-rate-sub{font-size:11px;color:var(--muted);margin-top:2px;}
   @media (max-width:520px){
     .home-branch-card{padding:18px;}
-    .home-branch-card .hb-right{text-align:left;gap:20px;justify-content:flex-start;}
+    .home-branch-card .hb-right{text-align:left;width:100%;gap:12px;justify-content:space-between;flex-wrap:nowrap;}
+    .home-branch-card .hb-rate-col:last-child{text-align:right;}
     .home-branch-card .hb-rate-val{font-size:26px;}
   }
 
@@ -374,8 +375,6 @@
     color:var(--gold-bright);font-size:17px;font-weight:700;
   }
   .calc-grid input[readonly]{color:var(--green);background:#141416;}
-  .calc-pair{display:flex;gap:8px;}
-  .calc-pair input{flex:1 1 0;min-width:0;width:100%;padding:12px 10px;font-size:15px;}
   .field input[readonly],.bill-inputs input[readonly]{color:var(--gold-bright);background:#141416;cursor:not-allowed;}
   .calc-grid input:focus{outline:none;border-color:var(--gold-bright);}
 
@@ -424,10 +423,6 @@
     margin-top:6px;padding-top:14px;
   }
   .bill-row.total span.val{color:var(--gold-bright);font-size:20px;}
-  .bill-formula{
-    font-size:11px;color:var(--muted);text-align:center;margin-top:12px;
-    font-style:italic;
-  }
 
   footer{
     max-width:1200px;margin:22px auto 0 auto;
@@ -665,14 +660,11 @@
   <div class="hint">Base rate aur masha value upar controls mein daalein — neeche auto calculate hoga.</div>
   <div class="calc-grid">
     <div class="box">
-      <label>1. Per Tola Gold Rate (24K | 21K)</label>
-      <div class="calc-pair">
-        <input type="text" id="tolaRateDisp" readonly placeholder="24K">
-        <input type="text" id="tolaRate21Disp" readonly placeholder="21K">
-      </div>
+      <label>1. Per Tola Gold Rate (21K)</label>
+      <input type="text" id="tolaRate21Disp" readonly placeholder="Upar se aayega">
     </div>
     <div class="box">
-      <label>2. Per Gram Gold Rate</label>
+      <label>2. Per Gram Gold Rate (24K)</label>
       <input type="text" id="gramRate" readonly placeholder="Auto Calculated">
     </div>
     <div class="box">
@@ -680,7 +672,7 @@
       <input type="text" id="mashaMakingDisp" readonly placeholder="Upar se aayega">
     </div>
     <div class="box">
-      <label>4. Per Gram Making Cost</label>
+      <label>4. Per Gram Making Cost (24K)</label>
       <input type="text" id="gramMaking" readonly placeholder="Auto Calculated">
     </div>
   </div>
@@ -734,7 +726,6 @@
       <span class="val" id="billTotal">--</span>
     </div>
   </div>
-  <div class="bill-formula">Formula: Making Cost = P × M × pT ÷ 11.664&nbsp;&nbsp;|&nbsp;&nbsp;P = product weight (grams), M = making grams/tola, pT = tola price of selected karat</div>
 
   <div class="wa-quote-row">
     <button type="button" class="wa-btn" id="waQuoteBtn">
@@ -932,7 +923,6 @@ function buildTicker(){
 function updateCalculator(){
   const base = getBase();
   const masha = getMasha();
-  document.getElementById('tolaRateDisp').value = base>0 ? fmt(base) : '';
   document.getElementById('tolaRate21Disp').value = base>0 ? fmt(karatValue(base,21)) : '';
   document.getElementById('mashaMakingDisp').value = masha>0 ? masha : '';
 
