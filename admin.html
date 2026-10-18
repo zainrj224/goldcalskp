@@ -85,29 +85,36 @@
   .admin-card button.print-btn{background:#1c2833;color:#fff;margin-top:16px;}
   .admin-card button.print-btn:hover{background:#000;color:#fff;}
 
-  /* ---- printable invoice (A4, merchant + customer copy) ---- */
+  /* ---- printable invoice (A4: merchant + customer copy, Rajput Jewellers letterhead) ---- */
   #printArea{display:none;}
   .inv-sheet{
-    width:210mm;height:296mm;padding:10mm;box-sizing:border-box;
+    width:210mm;height:296mm;padding:6mm;box-sizing:border-box;
     display:flex;flex-direction:column;
-    font-family:Verdana,'Segoe UI',Tahoma,sans-serif;color:#1c2833;background:#fff;
+    font-family:Verdana,'Segoe UI',Tahoma,sans-serif;color:#2b1608;background:#fff;
     -webkit-print-color-adjust:exact;print-color-adjust:exact;
   }
   .inv-copy{
-    flex:1;border:1px solid #d5d9de;border-radius:6px;padding:8mm 8mm 6mm;
-    display:flex;flex-direction:column;box-sizing:border-box;
+    flex:1;border:1px solid #cdb98a;box-sizing:border-box;overflow:hidden;
+    display:flex;flex-direction:column;
   }
-  .inv-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #b8860b;padding-bottom:3mm;}
-  .inv-shop{font-size:21px;font-weight:800;letter-spacing:.3px;}
-  .inv-sub{font-size:10px;color:#5d6d7e;margin-top:2px;}
-  .inv-badge{background:#fff3b0;border:1px solid #f0dc7a;color:#a67c00;font-weight:800;font-size:13px;letter-spacing:.08em;padding:5px 14px;border-radius:4px;white-space:nowrap;}
-  .inv-meta{display:flex;justify-content:space-between;background:#f4f6f8;padding:7px 9px;margin:4mm 0 3mm;font-size:11px;font-weight:700;color:#34495e;gap:8px;}
-  .inv-row{display:flex;justify-content:space-between;font-size:12px;font-weight:700;padding:7px 4px;border-bottom:1px dotted #d5d9de;}
-  .inv-total{display:flex;justify-content:space-between;font-size:16px;font-weight:800;padding:9px 4px;border-top:1.5px solid #1c2833;border-bottom:1.5px solid #1c2833;margin-top:2px;}
-  .inv-spacer{flex:1;}
-  .inv-sign{display:flex;justify-content:space-between;gap:30mm;}
-  .inv-sign div{flex:1;border-top:1px solid #1c2833;padding-top:4px;text-align:center;font-size:10px;font-weight:700;color:#34495e;}
-  .inv-cut{display:flex;align-items:center;gap:8px;height:10mm;font-size:10px;color:#5d6d7e;}
+  .inv-banner{display:block;width:100%;height:auto;}
+  .inv-body{flex:1;display:flex;flex-direction:column;padding:2.5mm 6mm 0;}
+  .inv-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:2mm;}
+  .inv-badge{background:#fff3b0;border:1px solid #e3c766;color:#8a6500;font-weight:800;font-size:11px;letter-spacing:.08em;padding:3px 12px;border-radius:3px;white-space:nowrap;}
+  .inv-no{font-size:12px;font-weight:700;color:#2b1608;}
+  .inv-nd{display:flex;gap:8mm;font-family:'Times New Roman',Times,serif;font-weight:700;font-size:16px;margin-bottom:2mm;}
+  .inv-nd > div{display:flex;align-items:flex-end;gap:4px;border-bottom:2px solid #2b1608;padding-bottom:1px;}
+  .inv-nd .nm{flex:1;}
+  .inv-nd .dt{min-width:52mm;}
+  .inv-nd span{font-family:Verdana,'Segoe UI',Tahoma,sans-serif;font-size:12px;font-weight:700;padding-bottom:1px;}
+  .inv-row{display:flex;justify-content:space-between;font-size:12px;font-weight:700;padding:1.6mm 2px;border-bottom:1px dotted #cdb98a;}
+  .inv-total{display:flex;justify-content:space-between;font-size:15px;font-weight:800;padding:2mm 2px;border-top:1.5px solid #2b1608;border-bottom:1.5px solid #2b1608;margin-top:1px;}
+  .inv-spacer{flex:1;min-height:2mm;}
+  .inv-sign{display:flex;justify-content:space-between;gap:30mm;padding-bottom:2.5mm;}
+  .inv-sign div{flex:1;border-top:1px solid #2b1608;padding-top:3px;text-align:center;font-size:10px;font-weight:700;color:#5a4630;}
+  .inv-foot{height:1.6mm;background:#e3b95c;}
+  .inv-foot2{height:3.2mm;background:#2b1608;}
+  .inv-cut{display:flex;align-items:center;gap:8px;height:8mm;font-size:10px;color:#6b5a45;}
   .inv-cut i{flex:1;border-top:1px dashed #9aa5b1;}
   @media print{
     @page{size:A4;margin:0;}
@@ -354,9 +361,8 @@
   }
 
   // ---- Print invoice (A4: merchant copy on top, customer copy below) ----
-  const SHOP_NAME = 'Rajput Jewelers';
-  const SHOP_ADDRESS = 'Sheikhupura';
-  const SHOP_PHONE = '0309-8092475';
+  const BANNER_SRC = 'assets/invoice-banner.jpg';   // Rajput Jewellers letterhead banner (logo + contact details)
+  (function preloadBanner(){ const im = new Image(); im.src = BANNER_SRC; })();
   const INVOICE_KEY = 'gc_last_invoice_no';
 
   function todayISO(){
@@ -388,25 +394,26 @@
 
   function invoiceCopy(label, d){
     return '<div class="inv-copy">' +
-      '<div class="inv-head">' +
-        '<div><div class="inv-shop">👑 ' + escapeHtml(SHOP_NAME) + '</div>' +
-        '<div class="inv-sub">' + escapeHtml(SHOP_ADDRESS) + ' | Phone: ' + escapeHtml(SHOP_PHONE) + '</div></div>' +
-        '<div class="inv-badge">' + label + '</div>' +
+      '<img class="inv-banner" src="' + BANNER_SRC + '" alt="Rajput Jewellers">' +
+      '<div class="inv-body">' +
+        '<div class="inv-top"><div class="inv-badge">' + label + '</div>' +
+          '<div class="inv-no">Invoice: #' + escapeHtml(d.invNo) + '</div></div>' +
+        '<div class="inv-nd"><div class="nm">Name: <span>' + escapeHtml(d.customer) + '</span></div>' +
+          '<div class="dt">Date: <span>' + escapeHtml(d.date) + '</span></div></div>' +
+        '<div class="inv-row"><span>Gold Rate ' + d.karat + 'K (Per Tola):</span><span>' + rs(d.pT) + '</span></div>' +
+        '<div class="inv-row"><span>Gold Rate (Per Gram):</span><span>Rs. ' + d.gramRate.toLocaleString('en-PK', {maximumFractionDigits:2}) + '</span></div>' +
+        '<div class="inv-row"><span>Product Weight:</span><span>' + d.weight.toLocaleString('en-PK', {maximumFractionDigits:3}) + ' gms</span></div>' +
+        '<div class="inv-row"><span>Gold Price:</span><span>' + rs(d.goldValue) + '</span></div>' +
+        '<div class="inv-row"><span>Making Charges:</span><span>' + rs(d.makingCost) + '</span></div>' +
+        '<div class="inv-total"><span>TOTAL PRICE:</span><span>' + rs(d.total) + '</span></div>' +
+        '<div class="inv-spacer"></div>' +
+        '<div class="inv-sign"><div>Customer Signature</div><div>Merchant Signature</div></div>' +
       '</div>' +
-      '<div class="inv-meta"><span>Customer: ' + escapeHtml(d.customer || '________________') + '</span>' +
-        '<span>Invoice: #' + escapeHtml(d.invNo) + '</span><span>Date: ' + escapeHtml(d.date) + '</span></div>' +
-      '<div class="inv-row"><span>Gold Rate ' + d.karat + 'K (Per Tola):</span><span>' + rs(d.pT) + '</span></div>' +
-      '<div class="inv-row"><span>Gold Rate (Per Gram):</span><span>Rs. ' + d.gramRate.toLocaleString('en-PK', {maximumFractionDigits:2}) + '</span></div>' +
-      '<div class="inv-row"><span>Product Weight:</span><span>' + d.weight.toLocaleString('en-PK', {maximumFractionDigits:3}) + ' gms</span></div>' +
-      '<div class="inv-row"><span>Gold Price:</span><span>' + rs(d.goldValue) + '</span></div>' +
-      '<div class="inv-row"><span>Making Charges:</span><span>' + rs(d.makingCost) + '</span></div>' +
-      '<div class="inv-total"><span>TOTAL PRICE:</span><span>' + rs(d.total) + '</span></div>' +
-      '<div class="inv-spacer"></div>' +
-      '<div class="inv-sign"><div>Customer Signature</div><div>Merchant Signature</div></div>' +
+      '<div class="inv-foot"></div><div class="inv-foot2"></div>' +
     '</div>';
   }
 
-  function printInvoice(){
+  async function printInvoice(){
     const msg = document.getElementById('invMsg');
     const karat = parseInt(document.getElementById('calcKarat').value, 10) || 24;
     const base = parseFloat(document.getElementById('rateInput').value) || 0;
@@ -450,6 +457,11 @@
       if(isFinite(n)) localStorage.setItem(INVOICE_KEY, String(n));
     } catch(e) {}
     msg.textContent = '';
+    // make sure the banner image is loaded before the print dialog opens
+    const imgs = Array.from(document.querySelectorAll('#printArea img'));
+    await Promise.all(imgs.map(function(im){
+      return im.decode ? im.decode().catch(function(){}) : Promise.resolve();
+    }));
     window.print();
     document.getElementById('invNo').value = nextInvoiceNo();
   }
