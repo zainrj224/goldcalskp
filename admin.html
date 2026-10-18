@@ -155,8 +155,15 @@
       <h1>Full Bill Calculator</h1>
       <div class="sub">Fast calculation ke liye — customer ka bill yahin nikal lein</div>
 
-      <label for="calcTolaRate">1 Tola Price (PKR)</label>
-      <input type="number" id="calcTolaRate" oninput="runBillCalc()">
+      <label for="calcKarat">Gold Karat</label>
+      <select id="calcKarat" onchange="runBillCalc()">
+        <option value="24">24 Karat</option>
+        <option value="22">22 Karat</option>
+        <option value="21">21 Karat</option>
+        <option value="20">20 Karat</option>
+        <option value="18">18 Karat</option>
+      </select>
+      <small id="calcTolaNote">1 Tola price: --</small>
 
       <label for="calcMasha">Standard Making (Grams / Tola)</label>
       <input type="number" id="calcMasha" oninput="runBillCalc()">
@@ -260,7 +267,6 @@
     document.getElementById('spotInput').checked = !!spot;
 
     // pre-fill the fast calculator with the current live values
-    document.getElementById('calcTolaRate').value = rate;
     document.getElementById('calcMasha').value = masha;
     runBillCalc();
   }
@@ -270,7 +276,10 @@
   function fmt2(n){ return n.toLocaleString('en-PK', {maximumFractionDigits:0}); }
 
   function runBillCalc(){
-    const pT = parseFloat(document.getElementById('calcTolaRate').value) || 0;
+    const karat = parseInt(document.getElementById('calcKarat').value, 10) || 24;
+    const base = parseFloat(document.getElementById('rateInput').value) || 0;   // 24K base rate from the card above
+    const pT = base * (karat / 24);                                           // tola price for the selected karat
+    document.getElementById('calcTolaNote').textContent = pT > 0 ? ('1 Tola ' + karat + 'K price: ' + fmt(pT) + ' PKR') : '1 Tola price: --';
     const M = parseFloat(document.getElementById('calcMasha').value) || 0;
     const P = parseFloat(document.getElementById('calcWeight').value) || 0;
 
@@ -432,6 +441,8 @@
       alert('Delete nahi ho saka — dobara koshish karein.');
     }
   }
+
+  document.getElementById('rateInput').addEventListener('input', runBillCalc);
 
   // auto-login if already logged in this session
   if(sessionStorage.getItem('gc_admin_ok') === '1'){
