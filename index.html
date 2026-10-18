@@ -353,12 +353,13 @@
   .bill-inputs .box label{
     display:block;font-size:13px;color:#b0b0b0;margin-bottom:6px;
   }
-  .bill-inputs input{
+  .bill-inputs input,.bill-inputs select{
     width:100%;padding:12px;border-radius:8px;
     border:1px solid var(--border);background:var(--card2);
     color:var(--gold-bright);font-size:17px;font-weight:700;
   }
-  .bill-inputs input:focus{outline:none;border-color:var(--gold-bright);}
+  .bill-inputs input:focus,.bill-inputs select:focus{outline:none;border-color:var(--gold-bright);}
+  .bill-inputs select{cursor:pointer;}
   .bill-inputs small{display:block;color:var(--muted);font-size:10px;margin-top:4px;}
   .bill-breakdown{
     border-top:1px dashed var(--border);
@@ -593,12 +594,18 @@
 
 <div class="bill-section">
   <h2>Full Bill Calculator — Apna Item Check Karein</h2>
-  <div class="hint">1 Tola ka rate daalein, product ka weight (grams mein) daalein — poori calculation neeche dikh jayegi. Making charges auto 2 gram/tola hai, chahe to manually adjust kar lein.</div>
+  <div class="hint">Karat select karein, product ka weight (grams mein) daalein — poori calculation neeche dikh jayegi. Making charges auto 2 gram/tola hai, chahe to manually adjust kar lein.</div>
   <div class="bill-inputs">
     <div class="box">
-      <label for="billTolaRate">1 Tola Price (PKR)</label>
-      <input type="number" id="billTolaRate" value="0" placeholder="e.g. 450000" oninput="updateBill()">
-      <small>Current tola rate jo aap ne upar set kiya (ya alag se yahan daal sakte hain)</small>
+      <label for="billKarat">Gold Karat</label>
+      <select id="billKarat" onchange="updateBill()">
+        <option value="24">24 Karat</option>
+        <option value="22">22 Karat</option>
+        <option value="21">21 Karat</option>
+        <option value="20">20 Karat</option>
+        <option value="18">18 Karat</option>
+      </select>
+      <small id="billTolaPriceNote">Tola price: --</small>
     </div>
     <div class="box">
       <label for="billMakingGrams">Standard Making (Grams / Tola)</label>
@@ -634,7 +641,7 @@
       <span class="val" id="billTotal">--</span>
     </div>
   </div>
-  <div class="bill-formula">Formula: Making Cost = P × M × pT ÷ 11.664&nbsp;&nbsp;|&nbsp;&nbsp;P = product weight (grams), M = making grams/tola, pT = current tola price</div>
+  <div class="bill-formula">Formula: Making Cost = P × M × pT ÷ 11.664&nbsp;&nbsp;|&nbsp;&nbsp;P = product weight (grams), M = making grams/tola, pT = tola price of selected karat</div>
 </div>
 
 <div class="grid" id="cityGrid">
@@ -792,8 +799,10 @@ function updateCalculator(){
 }
 
 function updateBill(){
-  const billTolaInput = document.getElementById('billTolaRate');
-  const pT = parseFloat(billTolaInput.value) || 0;
+  const karat = parseInt(document.getElementById('billKarat').value, 10) || 24;
+  const pT = karatValue(getBase(), karat);   // tola price for the selected karat (from the 24K base rate)
+  const tolaNote = document.getElementById('billTolaPriceNote');
+  if(tolaNote) tolaNote.textContent = pT>0 ? ('1 Tola ' + karat + 'K price: ' + fmt(pT) + ' PKR') : 'Tola price: --';
   const M = parseFloat(document.getElementById('billMakingGrams').value) || 0;
   const P = parseFloat(document.getElementById('billProductWeight').value) || 0;
 
