@@ -197,13 +197,14 @@
     border-radius:8px;padding:7px 12px;
   }
   .home-branch-card .hb-call:hover{border-color:var(--gold);}
-  .home-branch-card .hb-right{text-align:right;}
+  .home-branch-card .hb-right{text-align:right;display:flex;gap:28px;flex-wrap:wrap;justify-content:flex-end;}
+  .home-branch-card .hb-rate-col{min-width:0;}
   .home-branch-card .hb-rate-label{font-size:11px;color:var(--muted);margin-bottom:4px;}
   .home-branch-card .hb-rate-val{font-size:30px;font-weight:800;color:var(--gold-bright);line-height:1.1;}
   .home-branch-card .hb-rate-sub{font-size:11px;color:var(--muted);margin-top:2px;}
   @media (max-width:520px){
     .home-branch-card{padding:18px;}
-    .home-branch-card .hb-right{text-align:left;}
+    .home-branch-card .hb-right{text-align:left;gap:20px;justify-content:flex-start;}
     .home-branch-card .hb-rate-val{font-size:26px;}
   }
 
@@ -373,6 +374,8 @@
     color:var(--gold-bright);font-size:17px;font-weight:700;
   }
   .calc-grid input[readonly]{color:var(--green);background:#141416;}
+  .calc-pair{display:flex;gap:8px;}
+  .calc-pair input{flex:1 1 0;min-width:0;width:100%;padding:12px 10px;font-size:15px;}
   .field input[readonly],.bill-inputs input[readonly]{color:var(--gold-bright);background:#141416;cursor:not-allowed;}
   .calc-grid input:focus{outline:none;border-color:var(--gold-bright);}
 
@@ -609,9 +612,16 @@
     <a class="hb-call" href="tel:03098092475">📞 Call: 0309-8092475</a>
   </div>
   <div class="hb-right">
-    <div class="hb-rate-label">Today's Rate (24K / Tola)</div>
-    <div class="hb-rate-val" id="hbRateVal">--</div>
-    <div class="hb-rate-sub">PKR</div>
+    <div class="hb-rate-col">
+      <div class="hb-rate-label">Today's 24K Rate</div>
+      <div class="hb-rate-val" id="hbRateVal">--</div>
+      <div class="hb-rate-sub">PKR / Tola</div>
+    </div>
+    <div class="hb-rate-col">
+      <div class="hb-rate-label">Today's 21K Rate</div>
+      <div class="hb-rate-val" id="hbRateVal21">--</div>
+      <div class="hb-rate-sub">PKR / Tola</div>
+    </div>
   </div>
 </div>
 
@@ -655,8 +665,11 @@
   <div class="hint">Base rate aur masha value upar controls mein daalein — neeche auto calculate hoga.</div>
   <div class="calc-grid">
     <div class="box">
-      <label>1. Per Tola Gold Rate (24K)</label>
-      <input type="text" id="tolaRateDisp" readonly placeholder="Upar se aayega">
+      <label>1. Per Tola Gold Rate (24K | 21K)</label>
+      <div class="calc-pair">
+        <input type="text" id="tolaRateDisp" readonly placeholder="24K">
+        <input type="text" id="tolaRate21Disp" readonly placeholder="21K">
+      </div>
     </div>
     <div class="box">
       <label>2. Per Gram Gold Rate</label>
@@ -683,7 +696,6 @@
         <option value="24">24 Karat</option>
         <option value="22">22 Karat</option>
         <option value="21">21 Karat</option>
-        <option value="20">20 Karat</option>
         <option value="18">18 Karat</option>
       </select>
       <small id="billTolaPriceNote">Tola price: --</small>
@@ -921,6 +933,7 @@ function updateCalculator(){
   const base = getBase();
   const masha = getMasha();
   document.getElementById('tolaRateDisp').value = base>0 ? fmt(base) : '';
+  document.getElementById('tolaRate21Disp').value = base>0 ? fmt(karatValue(base,21)) : '';
   document.getElementById('mashaMakingDisp').value = masha>0 ? masha : '';
 
   const gramRate = base / GRAM_PER_TOLA;
@@ -961,6 +974,8 @@ function updateHomeBranch(){
   const val = cityState['Sheikhupura'] || 0;
   const el = document.getElementById('hbRateVal');
   if(el) el.textContent = val > 0 ? fmt(val) : '--';
+  const el21 = document.getElementById('hbRateVal21');
+  if(el21) el21.textContent = val > 0 ? fmt(karatValue(val,21)) : '--';
 }
 
 // ---- World Gold Price (free, no-key, CORS-enabled API: gold-api.com) ----
