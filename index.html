@@ -351,34 +351,7 @@
 
   .grid{margin-top:26px;}
 
-  /* ---- making charges calculator ---- */
-  .calc-section{
-    max-width:1200px;margin:0 auto 0 auto;
-    background:var(--card);
-    border:1px solid var(--border);
-    border-radius:14px;
-    padding:22px;
-  }
-  .calc-section h2{
-    color:var(--gold);margin:0 0 4px 0;font-size:17px;
-    text-transform:uppercase;letter-spacing:.5px;
-  }
-  .calc-section .hint{color:var(--muted);font-size:12px;margin-bottom:18px;}
-  .calc-grid{
-    display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
-    gap:16px;
-  }
-  .calc-grid .box label{
-    display:block;font-size:13px;color:#b0b0b0;margin-bottom:6px;
-  }
-  .calc-grid input{
-    width:100%;padding:12px;border-radius:8px;
-    border:1px solid var(--border);background:var(--card2);
-    color:var(--gold-bright);font-size:17px;font-weight:700;
-  }
-  .calc-grid input[readonly]{color:var(--green);background:#141416;}
   .field input[readonly],.bill-inputs input[readonly]{color:var(--gold-bright);background:#141416;cursor:not-allowed;}
-  .calc-grid input:focus{outline:none;border-color:var(--gold-bright);}
 
   /* ---- full bill / piece calculator ---- */
   .bill-section{
@@ -494,7 +467,7 @@
 
   @media (max-width:480px){
     body{padding:10px;}
-    .topbar,.controls,.calc-section{padding:14px;}
+    .topbar,.controls{padding:14px;}
     .brand h1{font-size:15px;}
     .brand span{font-size:10px;}
     .rate-main .val{font-size:22px;}
@@ -654,29 +627,6 @@
       <div>Per Gram<b id="silverGram">--</b></div>
       <div>Per 10 Gram<b id="silverTen">--</b></div>
       <div>Per Kg<b id="silverKg">--</b></div>
-    </div>
-  </div>
-</div>
-
-<div class="calc-section">
-  <h2>Making Charges Calculator</h2>
-  <div class="hint">Base rate aur masha value upar controls mein daalein — neeche auto calculate hoga.</div>
-  <div class="calc-grid">
-    <div class="box">
-      <label>1. Per Tola Gold Rate (21K)</label>
-      <input type="text" id="tolaRate21Disp" readonly placeholder="Upar se aayega">
-    </div>
-    <div class="box">
-      <label>2. Per Gram Gold Rate (21K)</label>
-      <input type="text" id="gramRate" readonly placeholder="Auto Calculated">
-    </div>
-    <div class="box">
-      <label>3. Per Tola Making (Masha)</label>
-      <input type="text" id="mashaMakingDisp" readonly placeholder="Upar se aayega">
-    </div>
-    <div class="box">
-      <label>4. Per Gram Making Cost (21K)</label>
-      <input type="text" id="gramMaking" readonly placeholder="Auto Calculated">
     </div>
   </div>
 </div>
@@ -923,21 +873,6 @@ function buildTicker(){
   row.innerHTML = items + items; // duplicate for seamless scroll
 }
 
-function updateCalculator(){
-  const base = getBase();
-  const base21 = karatValue(base, 21);   // everything in this calculator is shown for 21K
-  const masha = getMasha();
-  document.getElementById('tolaRate21Disp').value = base21>0 ? fmt(base21) : '';
-  document.getElementById('mashaMakingDisp').value = masha>0 ? masha : '';
-
-  const gramRate = base21 / GRAM_PER_TOLA;
-  document.getElementById('gramRate').value = gramRate>0 ? fmt2(gramRate) : '';
-
-  const tolaMakingCost = base21 * (masha/12);
-  const gramMaking = tolaMakingCost / GRAM_PER_TOLA;
-  document.getElementById('gramMaking').value = gramMaking>0 ? fmt2(gramMaking) : '';
-}
-
 const BILL_STD_MAKING = 2;   // standard making: 2 grams per tola (zero on 24K)
 
 // 24K gold has zero making charges: the field drops to 0 and a note explains why.
@@ -1065,7 +1000,6 @@ function rebuild(){
   renderCards();
   renderSilver();
   buildTicker();
-  updateCalculator();
   updateBill();
   updateHomeBranch();
 }
@@ -1187,7 +1121,6 @@ buildCards();
   renderCards();
   renderSilver();
   buildTicker();
-  updateCalculator();
   updateBill();
   updateHomeBranch();
   applyWorldGoldToggle();
