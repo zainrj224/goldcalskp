@@ -76,6 +76,11 @@
     background:transparent;color:var(--red);border:1px solid var(--red);
   }
   .admin-card button.lead-del:hover{background:var(--red);color:#fff;}
+  .vis-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0 6px;}
+  .vis-box{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:12px 10px;text-align:center;}
+  .vis-box b{display:block;font-size:22px;color:var(--gold-bright);line-height:1.2;}
+  .vis-box span{display:block;font-size:11px;color:var(--muted);margin-top:3px;}
+  .vis-note{font-size:11px;color:var(--muted);margin:0 0 14px;min-height:14px;}
   .src-badge{
     display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;
     vertical-align:middle;margin-left:6px;letter-spacing:.2px;
@@ -199,7 +204,7 @@
       <div class="sub">Fast calculation ke liye — customer ka bill yahin nikal lein</div>
 
       <label for="calcKarat">Gold Karat</label>
-      <select id="calcKarat" onchange="runBillCalc()">
+      <select id="calcKarat" onchange="onCalcKaratChange()">
         <option value="24">24 Karat</option>
         <option value="22">22 Karat</option>
         <option value="21">21 Karat</option>
@@ -210,6 +215,7 @@
 
       <label for="calcMasha">Standard Making (Grams / Tola)</label>
       <input type="number" id="calcMasha" oninput="runBillCalc()">
+      <small id="calcMashaNote"></small>
 
       <label for="calcWeight">Product Weight (Grams)</label>
       <input type="number" id="calcWeight" placeholder="e.g. 12.5" oninput="runBillCalc()">
@@ -243,7 +249,14 @@
 
     <div class="admin-card" id="leadsCard">
       <h1>Visitor Leads</h1>
-      <div class="sub">Pop-up aur WhatsApp Quotation ke zariye jama hone wale naam aur mobile numbers</div>
+      <div class="sub">Website par aane walon ki ginti aur pop-up / WhatsApp Quotation ke zariye jama hone wale naam aur mobile numbers</div>
+      <div class="vis-stats" id="visStats">
+        <div class="vis-box"><b id="visUniqueTotal">--</b><span>Different IPs (Total)</span></div>
+        <div class="vis-box"><b id="visUniqueToday">--</b><span>Different IPs Today</span></div>
+        <div class="vis-box"><b id="visUnique7">--</b><span>Last 7 Days</span></div>
+        <div class="vis-box"><b id="visVisits">--</b><span>Total Visits</span></div>
+      </div>
+      <div class="vis-note" id="visNote"></div>
       <div id="leadsList" style="font-size:13px;color:var(--muted);">Loading...</div>
       <hr class="divider">
       <button onclick="refreshLeads()" style="background:var(--card2);color:var(--text);border:1px solid var(--border);">Refresh</button>
@@ -332,6 +345,8 @@
 
     // pre-fill the fast calculator with the current live values
     document.getElementById('calcMasha').value = masha;
+    calcMashaAutoZero = false;
+    syncCalcMaking();
     initInvoiceFields();
     runBillCalc();
   }
@@ -339,6 +354,30 @@
   const GRAM_PER_TOLA = 11.664;
 
   function fmt2(n){ return n.toLocaleString('en-PK', {maximumFractionDigits:0}); }
+
+  // 24K gold has zero making charges: the field drops to 0 (still editable) and a note shows.
+  // Switching to another karat puts the standard making back.
+  let calcMashaSaved = null;
+  let calcMashaAutoZero = false;
+
+  function syncCalcMaking(){
+    const karat = parseInt(document.getElementById('calcKarat').value, 10) || 24;
+    const input = document.getElementById('calcMasha');
+    const note = document.getElementById('calcMashaNote');
+    if(karat === 24){
+      if(!calcMashaAutoZero){ calcMashaSaved = input.value; calcMashaAutoZero = true; }
+      input.value = 0;
+      note.textContent = 'Note: zero making charges on 24';
+    } else {
+      if(calcMashaAutoZero){ input.value = calcMashaSaved; calcMashaAutoZero = false; }
+      note.textContent = '';
+    }
+  }
+
+  function onCalcKaratChange(){
+    syncCalcMaking();
+    runBillCalc();
+  }
 
   function runBillCalc(){
     const karat = parseInt(document.getElementById('calcKarat').value, 10) || 24;
@@ -356,7 +395,7 @@
 
     document.getElementById('calcGramRate').textContent = gramRate>0 ? fmt2(gramRate) + ' PKR' : '--';
     document.getElementById('calcGoldValue').textContent = goldValue>0 ? fmt2(goldValue) + ' PKR' : '--';
-    document.getElementById('calcMakingCost').textContent = makingCost>0 ? fmt2(makingCost) + ' PKR' : '--';
+    document.getElementById('calcMakingCost').textContent = P>0 ? fmt2(makingCost) + ' PKR' : '--';
     document.getElementById('calcTotal').textContent = total>0 ? fmt2(total) + ' PKR' : '--';
   }
 
@@ -529,6 +568,7 @@
 
   // ---- Visitor leads ----
   const LEADS_API = '/.netlify/functions/leads';
+  const VISIT_API = '/.netlify/functions/visit';
 
   function escapeHtml(s){
     return String(s).replace(/[&<>"']/g, function(c){
@@ -536,7 +576,26 @@
     });
   }
 
+  async function refreshVisitors(){
+    const pass = enteredPass || sessionStorage.getItem('gc_admin_entered_pass') || '';
+    const note = document.getElementById('visNote');
+    try {
+      const res = await fetch(VISIT_API, { headers: { 'x-admin-pass': pass } });
+      if(!res.ok){ note.textContent = 'Visitor numbers load nahi ho sake.'; return; }
+      const v = await res.json();
+      const n = function(x){ return (x || 0).toLocaleString('en-PK'); };
+      document.getElementById('visUniqueTotal').textContent = n(v.uniqueTotal);
+      document.getElementById('visUniqueToday').textContent = n(v.uniqueToday);
+      document.getElementById('visUnique7').textContent = n(v.unique7);
+      document.getElementById('visVisits').textContent = n(v.visitsTotal);
+      note.textContent = v.lastVisit ? ('Aakhri visit: ' + new Date(v.lastVisit).toLocaleString('en-PK')) : 'Abhi tak koi visit record nahi hui.';
+    } catch(err){
+      note.textContent = 'Visitor numbers load nahi ho sake.';
+    }
+  }
+
   async function refreshLeads(){
+    refreshVisitors();
     const el = document.getElementById('leadsList');
     const pass = enteredPass || sessionStorage.getItem('gc_admin_entered_pass') || '';
     el.textContent = 'Loading...';

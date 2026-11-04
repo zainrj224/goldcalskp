@@ -408,6 +408,7 @@
   .bill-inputs input:focus,.bill-inputs select:focus{outline:none;border-color:var(--gold-bright);}
   .bill-inputs select{cursor:pointer;}
   .bill-inputs small{display:block;color:var(--muted);font-size:10px;margin-top:4px;}
+  .bill-inputs small.zero-note{color:var(--green);font-weight:700;font-size:11px;}
   .bill-breakdown{
     border-top:1px dashed var(--border);
     padding-top:16px;
@@ -697,7 +698,7 @@
     <div class="box">
       <label for="billMakingGrams">Standard Making (Grams / Tola)</label>
       <input type="number" id="billMakingGrams" value="2" readonly>
-      <small>Fixed — 2 gram/tola default</small>
+      <small id="billMakingHint">Fixed — 2 gram/tola default</small>
     </div>
     <div class="box">
       <label for="billProductWeight">Product Weight (Grams)</label>
@@ -937,8 +938,26 @@ function updateCalculator(){
   document.getElementById('gramMaking').value = gramMaking>0 ? fmt2(gramMaking) : '';
 }
 
+const BILL_STD_MAKING = 2;   // standard making: 2 grams per tola (zero on 24K)
+
+// 24K gold has zero making charges: the field drops to 0 and a note explains why.
+function syncMakingForKarat(karat){
+  const field = document.getElementById('billMakingGrams');
+  const hint = document.getElementById('billMakingHint');
+  if(karat === 24){
+    field.value = '0';
+    hint.textContent = 'Note: zero making charges on 24';
+    hint.classList.add('zero-note');
+  } else {
+    field.value = String(BILL_STD_MAKING);
+    hint.textContent = 'Fixed — ' + BILL_STD_MAKING + ' gram/tola default';
+    hint.classList.remove('zero-note');
+  }
+}
+
 function getBillValues(){
   const karat = parseInt(document.getElementById('billKarat').value, 10) || 24;
+  syncMakingForKarat(karat);
   const pT = karatValue(getBase(), karat);   // tola price for the selected karat (from the 24K base rate)
   const M = parseFloat(document.getElementById('billMakingGrams').value) || 0;
   const P = parseFloat(document.getElementById('billProductWeight').value) || 0;
@@ -958,7 +977,7 @@ function updateBill(){
   document.getElementById('billGramRate').textContent = b.gramRate>0 ? fmt2(b.gramRate) + ' PKR' : '--';
   document.getElementById('billWeightDisp').textContent = b.P>0 ? fmt2(b.P) + ' g' : '--';
   document.getElementById('billGoldValue').textContent = b.goldValue>0 ? fmt2(b.goldValue) + ' PKR' : '--';
-  document.getElementById('billMakingCost').textContent = b.makingCost>0 ? fmt2(b.makingCost) + ' PKR' : '--';
+  document.getElementById('billMakingCost').textContent = b.P>0 ? (b.makingCost>0 ? fmt2(b.makingCost) : '0') + ' PKR' : '--';
   document.getElementById('billTotal').textContent = b.total>0 ? fmt2(b.total) + ' PKR' : '--';
 }
 
@@ -1259,6 +1278,18 @@ buildCards();
   }
 })();
 
+// ---- Visit counter: tell the server a visitor arrived (once per browser per day) ----
+(function trackVisit(){
+  try {
+    const day = new Date().toISOString().slice(0, 10);
+    if (localStorage.getItem('gc_visit_day') === day) return;
+    localStorage.setItem('gc_visit_day', day);
+  } catch(e) {}
+  try {
+    fetch('/.netlify/functions/visit', { method: 'POST', keepalive: true }).catch(function(){});
+  } catch(e) {}
+})();
+
 // ---- WhatsApp quotation: logs the visitor's number as a lead, then opens WhatsApp ----
 (function(){
   const LEADS_API = '/.netlify/functions/leads';
@@ -1331,7 +1362,7 @@ buildCards();
       lines.push(
         'Weight: ' + fmt2(q.P) + ' g',
         'Gold Value: ' + money(q.goldValue),
-        'Making (' + q.M + ' g/tola): ' + money(q.makingCost),
+        (q.makingCost > 0 ? 'Making (' + q.M + ' g/tola): ' + money(q.makingCost) : 'Making Charges: Zero'),
         'Total: ' + money(q.total)
       );
     } else {
