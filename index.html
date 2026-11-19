@@ -589,6 +589,11 @@
       <div class="hb-rate-sub">PKR / Tola</div>
     </div>
     <div class="hb-rate-col">
+      <div class="hb-rate-label">Today's 22K Rate</div>
+      <div class="hb-rate-val" id="hbRateVal22">--</div>
+      <div class="hb-rate-sub">PKR / Tola</div>
+    </div>
+    <div class="hb-rate-col">
       <div class="hb-rate-label">Today's 21K Rate</div>
       <div class="hb-rate-val" id="hbRateVal21">--</div>
       <div class="hb-rate-sub">PKR / Tola</div>
@@ -921,6 +926,8 @@ function updateHomeBranch(){
   const val = cityState['Sheikhupura'] || 0;
   const el = document.getElementById('hbRateVal');
   if(el) el.textContent = val > 0 ? fmt(val) : '--';
+  const el22 = document.getElementById('hbRateVal22');
+  if(el22) el22.textContent = val > 0 ? fmt(karatValue(val,22)) : '--';
   const el21 = document.getElementById('hbRateVal21');
   if(el21) el21.textContent = val > 0 ? fmt(karatValue(val,21)) : '--';
 }
