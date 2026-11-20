@@ -198,6 +198,26 @@
   }
   .home-branch-card .hb-call:hover{border-color:var(--gold);}
   /* 24K on top, 21K underneath */
+  /* 7-day rate graph */
+  .home-branch-card .hb-chart{flex:1 1 280px;min-width:240px;display:flex;flex-direction:column;justify-content:center;}
+  .hb-chart-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:2px;flex-wrap:wrap;}
+  .hb-chart-title{font-size:14px;font-weight:800;color:var(--gold-bright);}
+  .hb-chart-change{font-size:13px;font-weight:700;margin-top:2px;color:var(--muted);}
+  .hb-chart-change.up{color:var(--green);}
+  .hb-chart-change.down{color:var(--red);}
+  .hb-chart-tabs{display:flex;gap:6px;}
+  .hb-chart-tab{border:1px solid var(--border);background:transparent;color:var(--muted);font-size:11px;font-weight:700;padding:3px 11px;border-radius:20px;cursor:pointer;}
+  .hb-chart-tab.active{background:var(--gold);border-color:var(--gold);color:#141416;}
+  .hb-chart #hbChartBody{touch-action:pan-y;cursor:pointer;}
+  .hb-chart svg{width:100%;height:auto;display:block;overflow:visible;}
+  .hb-chart .c-line{fill:none;stroke-width:3;stroke-linejoin:round;stroke-linecap:round;}
+  .hb-chart .c-tipline{stroke:var(--gold-bright);stroke-width:1.5;stroke-dasharray:4 4;opacity:.8;}
+  .hb-chart .c-tipdot{fill:var(--card);stroke:var(--gold-bright);stroke-width:3;}
+  .hb-chart .c-tipbg{fill:var(--gold);}
+  .hb-chart .c-tiptext{font-size:12px;font-weight:800;fill:#141416;text-anchor:middle;}
+  .hb-chart .c-day{font-size:11px;fill:var(--muted);text-anchor:middle;}
+  .hb-chart .c-day.active{fill:var(--gold-bright);font-weight:800;}
+  .hb-chart-note{font-size:11px;color:var(--muted);margin-top:2px;}
   .home-branch-card .hb-right{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:12px;flex:0 0 auto;max-width:100%;margin-left:auto;}
   .home-branch-card .hb-rate-col{flex:0 0 auto;}
   .home-branch-card .hb-rate-col + .hb-rate-col{border-top:1px solid var(--border);padding-top:10px;}
@@ -206,6 +226,7 @@
   .home-branch-card .hb-rate-sub{font-size:11px;color:var(--muted);margin-top:2px;}
   @media (max-width:520px){
     .home-branch-card{padding:18px;}
+    .home-branch-card .hb-chart{order:3;flex:1 1 100%;min-width:0;width:100%;}
     .home-branch-card .hb-right{text-align:left;width:100%;align-items:flex-start;gap:10px;}
     .home-branch-card .hb-rate-col + .hb-rate-col{width:100%;}
     .home-branch-card .hb-rate-val{font-size:26px;}
@@ -582,6 +603,20 @@
     <div class="hb-sub">Timeless Artistry · Gold &amp; Jewelry Showroom</div>
     <a class="hb-call" href="tel:03098092475">📞 Call: 0309-8092475</a>
   </div>
+  <div class="hb-chart" id="hbChart">
+    <div class="hb-chart-head">
+      <div>
+        <div class="hb-chart-title" id="hbChartTitle">24K Gold (Tola) — Last 7 Days</div>
+        <div class="hb-chart-change" id="hbChartChange"></div>
+      </div>
+      <div class="hb-chart-tabs" id="hbChartTabs">
+        <button type="button" class="hb-chart-tab active" data-mode="gold">Gold</button>
+        <button type="button" class="hb-chart-tab" data-mode="silver" style="display:none;">Silver</button>
+      </div>
+    </div>
+    <div id="hbChartBody"></div>
+    <div class="hb-chart-note" id="hbChartNote"></div>
+  </div>
   <div class="hb-right">
     <div class="hb-rate-col">
       <div class="hb-rate-label">Today's 24K Rate</div>
@@ -922,6 +957,195 @@ function updateBill(){
 }
 
 
+// ---- 7-day rate graph (hero card) ----
+let rateHistory = null;
+let chartMode = 'gold';
+let chartActive = null;   // day index shown in the tooltip (null = latest day)
+let chartGeom = null;
+
+async function loadRateHistory(){
+  try {
+    const res = await fetch('/.netlify/functions/history', { cache: 'no-store' });
+    if(!res.ok) return;
+    rateHistory = await res.json();
+    renderRateChart();
+  } catch(err) {
+    // network error — keep whatever graph is already shown
+  }
+}
+
+function renderRateChart(){
+  const body = document.getElementById('hbChartBody');
+  if(!body) return;
+  const days = (rateHistory && Array.isArray(rateHistory.days)) ? rateHistory.days : [];
+
+  // Silver tab only when a silver rate has been set
+  const hasSilver = days.some(d => d.silver > 0);
+  if(!hasSilver) chartMode = 'gold';
+  const silverTab = document.querySelector('.hb-chart-tab[data-mode="silver"]');
+  if(silverTab) silverTab.style.display = hasSilver ? '' : 'none';
+  document.querySelectorAll('.hb-chart-tab').forEach(function(t){
+    t.classList.toggle('active', t.dataset.mode === chartMode);
+  });
+  document.getElementById('hbChartTitle').textContent =
+    chartMode === 'silver' ? 'Silver (Tola) · Last 7 days' : '24K Gold (Tola) · Last 7 days';
+
+  const pts = days.map(function(d){
+    const v = chartMode === 'silver' ? d.silver : d.rate;
+    return { label: d.label, v: v > 0 ? v : null };
+  });
+  const vals = pts.filter(p => p.v != null).map(p => p.v);
+  const changeEl = document.getElementById('hbChartChange');
+  const noteEl = document.getElementById('hbChartNote');
+
+  if(vals.length === 0){
+    body.innerHTML = '';
+    changeEl.textContent = '';
+    changeEl.className = 'hb-chart-change';
+    noteEl.textContent = 'Graph ke liye abhi data nahi hai.';
+    return;
+  }
+
+  // change between the first and last day we have data for
+  if(vals.length >= 2){
+    const diff = vals[vals.length - 1] - vals[0];
+    const pct = vals[0] ? (diff / vals[0]) * 100 : 0;
+    if(Math.round(diff) === 0){
+      changeEl.className = 'hb-chart-change';
+      changeEl.textContent = '— No change';
+    } else {
+      const up = diff > 0;
+      changeEl.className = 'hb-chart-change ' + (up ? 'up' : 'down');
+      changeEl.textContent = (up ? '+ ' : '− ') + Math.abs(pct).toFixed(2) + '%  ·  ' + fmt(Math.abs(diff)) + ' PKR';
+    }
+  } else {
+    changeEl.className = 'hb-chart-change';
+    changeEl.textContent = '';
+  }
+  noteEl.textContent = vals.length < 7
+    ? ('Abhi ' + vals.length + '/7 din ka data hai — har din naya rate jama hota hai.')
+    : '';
+
+  // ---- draw the line chart (inline SVG): smooth curve, gradient line + fill, tooltip on the active day ----
+  const W = Math.max(240, Math.round(body.clientWidth || 420)), H = 170, padL = 14, padR = 14, padT = 40, padB = 26;
+  let min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
+  if(min === max){
+    const pad = (min * 0.01) || 1;
+    min -= pad; max += pad;
+  } else {
+    const pad = (max - min) * 0.25;
+    min -= pad; max += pad;
+  }
+  const n = pts.length;
+  const slot = (W - padL - padR) / n;
+  const X = i => padL + (i + 0.5) * slot;
+  const Y = v => padT + (1 - (v - min) / (max - min)) * (H - padT - padB);
+  const base = H - padB;
+
+  const have = pts.map((p, i) => p.v != null ? { x: X(i), y: Y(p.v), v: p.v, i: i } : null).filter(Boolean);
+  const last = have[have.length - 1];
+  const active = have.filter(q => q.i === chartActive)[0] || last;
+  chartGeom = { W: W, have: have };
+
+  let line = '';
+  if(have.length > 1) line = smoothPath(have);
+  const area = line ? (line + ' L' + last.x.toFixed(1) + ' ' + base + ' L' + have[0].x.toFixed(1) + ' ' + base + ' Z') : '';
+
+  let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="7 day rate graph">' +
+    '<defs>' +
+    '<linearGradient id="hbLineGrad" x1="0" y1="0" x2="1" y2="0">' +
+    '<stop offset="0%" style="stop-color:var(--gold)"/><stop offset="100%" style="stop-color:var(--gold-bright)"/></linearGradient>' +
+    '<linearGradient id="hbAreaGrad" x1="0" y1="0" x2="0" y2="1">' +
+    '<stop offset="0%" style="stop-color:var(--gold-bright);stop-opacity:.38"/>' +
+    '<stop offset="100%" style="stop-color:var(--gold-bright);stop-opacity:0"/></linearGradient></defs>';
+  if(area) svg += '<path d="' + area + '" fill="url(#hbAreaGrad)"/>';
+  if(line) svg += '<path class="c-line" d="' + line + '" stroke="url(#hbLineGrad)"/>';
+
+  // tooltip: dashed line, dot and value pill on the active day
+  const label = fmt(active.v);
+  const tw = label.length * 7.6 + 22, th = 24;
+  let tx = active.x - tw / 2;
+  tx = Math.max(2, Math.min(W - tw - 2, tx));
+  const ty = Math.max(2, active.y - th - 12);
+  svg += '<line class="c-tipline" x1="' + active.x.toFixed(1) + '" y1="' + (ty + th) + '" x2="' + active.x.toFixed(1) + '" y2="' + base + '"/>';
+  svg += '<circle class="c-tipdot" cx="' + active.x.toFixed(1) + '" cy="' + active.y.toFixed(1) + '" r="5"/>';
+  svg += '<rect class="c-tipbg" x="' + tx.toFixed(1) + '" y="' + ty.toFixed(1) + '" width="' + tw.toFixed(1) + '" height="' + th + '" rx="8"/>';
+  svg += '<text class="c-tiptext" x="' + (tx + tw / 2).toFixed(1) + '" y="' + (ty + 16).toFixed(1) + '">' + label + '</text>';
+
+  pts.forEach(function(p, i){
+    const isActive = i === active.i;
+    const text = (i === n - 1) ? 'Today' : p.label;
+    svg += '<text class="c-day' + (isActive ? ' active' : '') + '" x="' + X(i).toFixed(1) + '" y="' + (H - 6) + '">' + text + '</text>';
+  });
+  svg += '</svg>';
+  body.innerHTML = svg;
+}
+
+// smooth (monotone cubic) curve through the points — no overshoot above/below the data
+function smoothPath(p){
+  const n = p.length;
+  const dx = [], m = [], t = [];
+  for(let i = 0; i < n - 1; i++){
+    dx[i] = p[i + 1].x - p[i].x;
+    m[i] = (p[i + 1].y - p[i].y) / dx[i];
+  }
+  t[0] = m[0];
+  t[n - 1] = m[n - 2];
+  for(let i = 1; i < n - 1; i++){
+    t[i] = (m[i - 1] * m[i] <= 0) ? 0 : (m[i - 1] + m[i]) / 2;
+  }
+  for(let i = 0; i < n - 1; i++){
+    if(m[i] === 0){ t[i] = 0; t[i + 1] = 0; continue; }
+    const a = t[i] / m[i], b = t[i + 1] / m[i], s2 = a * a + b * b;
+    if(s2 > 9){
+      const k = 3 / Math.sqrt(s2);
+      t[i] = k * a * m[i];
+      t[i + 1] = k * b * m[i];
+    }
+  }
+  let d = 'M' + p[0].x.toFixed(1) + ' ' + p[0].y.toFixed(1);
+  for(let i = 0; i < n - 1; i++){
+    const h = dx[i] / 3;
+    d += ' C' + (p[i].x + h).toFixed(1) + ' ' + (p[i].y + t[i] * h).toFixed(1) + ' ' +
+         (p[i + 1].x - h).toFixed(1) + ' ' + (p[i + 1].y - t[i + 1] * h).toFixed(1) + ' ' +
+         p[i + 1].x.toFixed(1) + ' ' + p[i + 1].y.toFixed(1);
+  }
+  return d;
+}
+
+// touch / hover: move the tooltip to the day under the finger or mouse
+(function wireChartPointer(){
+  const body = document.getElementById('hbChartBody');
+  if(!body) return;
+  function pick(e){
+    if(!chartGeom) return;
+    const svg = body.querySelector('svg');
+    if(!svg) return;
+    const r = svg.getBoundingClientRect();
+    const x = (e.clientX - r.left) * (chartGeom.W / (r.width || 1));
+    let best = null, bd = Infinity;
+    chartGeom.have.forEach(function(q){
+      const d = Math.abs(q.x - x);
+      if(d < bd){ bd = d; best = q; }
+    });
+    if(best && best.i !== chartActive){ chartActive = best.i; renderRateChart(); }
+  }
+  body.addEventListener('pointermove', pick);
+  body.addEventListener('pointerdown', pick);
+  body.addEventListener('pointerleave', function(){
+    if(chartActive !== null){ chartActive = null; renderRateChart(); }
+  });
+})();
+
+document.querySelectorAll('.hb-chart-tab').forEach(function(t){
+  t.addEventListener('click', function(){ chartMode = t.dataset.mode; chartActive = null; renderRateChart(); });
+});
+let chartResizeTimer = null;
+window.addEventListener('resize', function(){
+  clearTimeout(chartResizeTimer);
+  chartResizeTimer = setTimeout(renderRateChart, 150);
+});
+
 function updateHomeBranch(){
   const val = cityState['Sheikhupura'] || 0;
   const el = document.getElementById('hbRateVal');
@@ -1111,12 +1335,14 @@ async function pollAdminSettings(){
       rebuild();
       restartLive();
       applyWorldGoldToggle();
+      loadRateHistory();
     }
   } catch(err){
     // network error — try again on the next poll
   }
 }
 setInterval(pollAdminSettings, 10000);
+setInterval(loadRateHistory, 300000);
 
 // init
 applyTheme('light');
@@ -1132,6 +1358,7 @@ buildCards();
   updateHomeBranch();
   applyWorldGoldToggle();
   restartLive();
+  loadRateHistory();
   tickClock();
   setInterval(tickClock, 1000);
 })();

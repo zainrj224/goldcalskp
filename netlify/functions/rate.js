@@ -2,6 +2,7 @@ const { getStore } = require('@netlify/blobs');
 
 const STORE_NAME = 'gc-admin-settings';
 const KEY = 'settings';
+const HISTORY_KEY = 'rate-history';   // change log used by the 7-day graph (read by history.js)
 
 const DEFAULTS = {
   rate: 450000,
@@ -110,6 +111,20 @@ exports.handler = async (event) => {
       };
 
       await store.setJSON(KEY, settings);
+
+      // remember rate changes so the website can draw the 7-day graph
+      try {
+        let log = await store.get(HISTORY_KEY, { type: 'json' });
+        if (!Array.isArray(log)) log = [];
+        const last = log[log.length - 1];
+        if (!last || last.rate !== settings.rate || (last.silver || 0) !== (settings.silver || 0)) {
+          log.push({ t: settings.updatedAt, rate: settings.rate, silver: settings.silver || 0 });
+          if (log.length > 500) log = log.slice(-500);
+          await store.setJSON(HISTORY_KEY, log);
+        }
+      } catch (err) {
+        console.error('rate history log failed:', err);
+      }
 
       return json(200, settings);
     }
