@@ -673,7 +673,7 @@
 
 <div class="bill-section">
   <h2>Full Bill Calculator — Apna Item Check Karein</h2>
-  <div class="hint">Karat select karein, product ka weight (grams mein) daalein — poori calculation neeche dikh jayegi. Making charges auto 2 gram/tola hai, chahe to manually adjust kar lein.</div>
+  <div class="hint">Karat select karein, product ka weight (grams mein) daalein — poori calculation neeche dikh jayegi. Making charges admin ke set kiye hue masha/tola ke hisab se auto lagte hain.</div>
   <div class="bill-inputs">
     <div class="box">
       <label for="billKarat">Gold Karat</label>
@@ -686,9 +686,9 @@
       <small id="billTolaPriceNote">Tola price: --</small>
     </div>
     <div class="box">
-      <label for="billMakingGrams">Standard Making (Grams / Tola)</label>
+      <label for="billMakingGrams">Standard Making (Masha / Tola)</label>
       <input type="number" id="billMakingGrams" value="2" readonly>
-      <small id="billMakingHint">Fixed — 2 gram/tola default</small>
+      <small id="billMakingHint">Fixed — standard making</small>
     </div>
     <div class="box">
       <label for="billProductWeight">Product Weight (Grams)</label>
@@ -913,7 +913,11 @@ function buildTicker(){
   row.innerHTML = items + items; // duplicate for seamless scroll
 }
 
-const BILL_STD_MAKING = 2;   // standard making: 2 grams per tola (zero on 24K)
+// Standard making comes from the admin's "Making Charges — Per Tola (Masha)" setting (default 2); zero on 24K.
+function billStdMaking(){
+  const m = (typeof latestAdminSettings !== 'undefined' && latestAdminSettings) ? parseFloat(latestAdminSettings.masha) : NaN;
+  return (isFinite(m) && m >= 0) ? m : 2;
+}
 
 // 24K gold has zero making charges: the field drops to 0 and a note explains why.
 function syncMakingForKarat(karat){
@@ -924,8 +928,9 @@ function syncMakingForKarat(karat){
     hint.textContent = 'Note: zero making charges on 24';
     hint.classList.add('zero-note');
   } else {
-    field.value = String(BILL_STD_MAKING);
-    hint.textContent = 'Fixed — ' + BILL_STD_MAKING + ' gram/tola default';
+    const std = billStdMaking();
+    field.value = String(std);
+    hint.textContent = 'Fixed — ' + std + ' masha/tola default';
     hint.classList.remove('zero-note');
   }
 }
@@ -939,7 +944,8 @@ function getBillValues(){
 
   const gramRate = pT / GRAM_PER_TOLA;
   const goldValue = P * gramRate;
-  const makingCost = (P / GRAM_PER_TOLA) * (M / GRAM_PER_TOLA) * pT;
+  // making = M masha per tola (1 masha = 1/12 tola): P/11.664 tolas x (pT x M/12)
+  const makingCost = (P / GRAM_PER_TOLA) * pT * (M / 12);
   const total = goldValue + makingCost;
   return { karat, pT, M, P, gramRate, goldValue, makingCost, total };
 }
@@ -1529,7 +1535,7 @@ buildCards();
       lines.push(
         'Weight: ' + fmt2(q.P) + ' g',
         'Gold Value: ' + money(q.goldValue),
-        (q.makingCost > 0 ? 'Making (' + q.M + ' g/tola): ' + money(q.makingCost) : 'Making Charges: Zero'),
+        (q.makingCost > 0 ? 'Making (' + q.M + ' masha/tola): ' + money(q.makingCost) : 'Making Charges: Zero'),
         'Total: ' + money(q.total)
       );
     } else {

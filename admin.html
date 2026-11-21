@@ -226,7 +226,7 @@
       </select>
       <small id="calcTolaNote">1 Tola price: --</small>
 
-      <label for="calcMasha">Standard Making (Grams / Tola)</label>
+      <label for="calcMasha">Standard Making (Masha / Tola)</label>
       <input type="number" id="calcMasha" oninput="runBillCalc()">
       <small id="calcMashaNote"></small>
 
@@ -470,7 +470,7 @@
     const gramRate = pT / GRAM_PER_TOLA;
     // round each line to whole rupees so the total always equals the sum of the printed lines
     const goldValue = Math.round(P * gramRate);
-    const makingCost = Math.round((P / GRAM_PER_TOLA) * (M / GRAM_PER_TOLA) * pT);
+    const makingCost = Math.round((P / GRAM_PER_TOLA) * pT * (M / 12));
     const total = goldValue + makingCost;
 
     document.getElementById('calcGramRate').textContent = gramRate>0 ? fmt2(gramRate) + ' PKR' : '--';
@@ -547,7 +547,7 @@
     const pT = base * (karat / 24);
     const gramRate = pT / GRAM_PER_TOLA;
     const goldValue = Math.round(P * gramRate);
-    const makingCost = Math.round((P / GRAM_PER_TOLA) * (M / GRAM_PER_TOLA) * pT);
+    const makingCost = Math.round((P / GRAM_PER_TOLA) * pT * (M / 12));
     const invNo = document.getElementById('invNo').value.trim() || nextInvoiceNo();
 
     const data = {
