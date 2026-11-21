@@ -1,8 +1,8 @@
 const { getStore } = require('@netlify/blobs');
+const { dayKey, loadDays, saveDays } = require('./lib/rate-days');
 
 const STORE_NAME = 'gc-admin-settings';
 const KEY = 'settings';
-const HISTORY_KEY = 'rate-history';   // change log used by the 7-day graph (read by history.js)
 
 const DEFAULTS = {
   rate: 450000,
@@ -112,18 +112,13 @@ exports.handler = async (event) => {
 
       await store.setJSON(KEY, settings);
 
-      // remember rate changes so the website can draw the 7-day graph
+      // one row per date for the 7-day graph: saving again on the same date replaces that date's row
       try {
-        let log = await store.get(HISTORY_KEY, { type: 'json' });
-        if (!Array.isArray(log)) log = [];
-        const last = log[log.length - 1];
-        if (!last || last.rate !== settings.rate || (last.silver || 0) !== (settings.silver || 0)) {
-          log.push({ t: settings.updatedAt, rate: settings.rate, silver: settings.silver || 0 });
-          if (log.length > 500) log = log.slice(-500);
-          await store.setJSON(HISTORY_KEY, log);
-        }
+        const days = await loadDays(store);
+        days[dayKey(settings.updatedAt)] = { rate: settings.rate, silver: settings.silver || 0 };
+        await saveDays(store, days);
       } catch (err) {
-        console.error('rate history log failed:', err);
+        console.error('rate history save failed:', err);
       }
 
       return json(200, settings);

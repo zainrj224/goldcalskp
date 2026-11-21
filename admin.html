@@ -76,11 +76,6 @@
     background:transparent;color:var(--red);border:1px solid var(--red);
   }
   .admin-card button.lead-del:hover{background:var(--red);color:#fff;}
-  .hist-row{display:grid;grid-template-columns:1.1fr 1.5fr 1fr;gap:8px;align-items:center;margin-bottom:8px;}
-  .hist-row .hist-day{font-size:12px;color:var(--text);font-weight:700;line-height:1.25;}
-  .hist-row .hist-day small{display:block;font-weight:400;color:var(--muted);font-size:10px;}
-  .hist-head{font-size:10px;color:var(--muted);margin-bottom:4px;}
-  .admin-card .hist-row input{padding:9px 8px;font-size:13px;margin:0;}
   .vis-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0 6px;}
   .vis-box{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:12px 10px;text-align:center;}
   .vis-box b{display:block;font-size:22px;color:var(--gold-bright);line-height:1.2;}
@@ -204,12 +199,12 @@
       <div class="status-msg" id="saveMsg"></div>
     </div>
 
-    <div class="admin-card" id="histCard">
-      <h1>Graph History — Past Rates</h1>
-      <div class="sub">Website ke 7-din ke graph ke liye pichle dinon ke rates yahan daalein ya theek karein. Aaj ka rate upar "Base Tola Rate" se banta hai.</div>
-      <div id="histRows"></div>
-      <button onclick="saveHistory()">Save Past Rates</button>
-      <div class="status-msg" id="histMsg"></div>
+    <div class="admin-card" id="salesCard">
+      <h1>Salesman Daily Rate Page</h1>
+      <div class="sub">Salesman ko sirf yeh link dein — wo khol kar naya rate daalega, graph khud update ho jayega. Is page par sirf rate update hota hai, baaqi admin cheezein nahi.</div>
+      <label>Link</label>
+      <input type="text" id="salesLink" readonly onclick="this.select()">
+      <small>Ek date par dobara rate daalne se sirf usi date ka rate badalta hai. Alag passcode dena ho to Netlify mein SALESMAN_PASS set karein; warna admin passcode chalta hai.</small>
     </div>
 
     <div class="admin-card" id="billCalcCard">
@@ -323,71 +318,11 @@
     document.getElementById('loginCard').style.display = 'block';
   }
 
-  // ---- past rates (graph history) ----
-  const HISTORY_API = '/.netlify/functions/history';
-
-  async function loadHistoryEditor(){
-    const box = document.getElementById('histRows');
-    box.innerHTML = '<div class="hist-head">Loading...</div>';
-    let days = [];
-    try {
-      const res = await fetch(HISTORY_API, { cache: 'no-store' });
-      if(res.ok){ days = (await res.json()).days || []; }
-    } catch(err) { /* show empty rows */ }
-    // today is controlled by Base Tola Rate, so only past days are editable
-    const past = days.slice(0, -1);
-    if(past.length === 0){
-      box.innerHTML = '<div class="hist-head">History load nahi ho saki.</div>';
-      return;
-    }
-    let html = '<div class="hist-row hist-head"><span>Din</span><span>24K Tola Rate (PKR)</span><span>Silver (PKR)</span></div>';
-    past.forEach(function(d){
-      html += '<div class="hist-row" data-date="' + escapeHtml(d.date) + '">' +
-        '<div class="hist-day">' + escapeHtml(d.label) + '<small>' + escapeHtml(d.date) + '</small></div>' +
-        '<input type="number" class="hist-rate" placeholder="e.g. 390000" value="' + (d.rate > 0 ? d.rate : '') + '">' +
-        '<input type="number" class="hist-silver" placeholder="optional" value="' + (d.silver > 0 ? d.silver : '') + '">' +
-        '</div>';
-    });
-    box.innerHTML = html;
-  }
-
-  async function saveHistory(){
-    const msg = document.getElementById('histMsg');
-    const entries = [];
-    document.querySelectorAll('#histRows .hist-row[data-date]').forEach(function(row){
-      const rate = row.querySelector('.hist-rate').value.trim();
-      const silver = row.querySelector('.hist-silver').value.trim();
-      if(rate !== ''){
-        entries.push({ date: row.dataset.date, rate: parseFloat(rate), silver: silver === '' ? 0 : parseFloat(silver) });
-      }
-    });
-    if(entries.length === 0){
-      msg.textContent = 'Kam az kam ek din ka rate daalein.';
-      msg.className = 'status-msg err';
-      return;
-    }
-    const pass = enteredPass || sessionStorage.getItem('gc_admin_entered_pass') || '';
-    try {
-      const res = await fetch(HISTORY_API, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-pass': pass },
-        body: JSON.stringify({ entries })
-      });
-      if(res.status === 401){ backToLogin(); return; }
-      const data = await res.json().catch(function(){ return {}; });
-      if(!res.ok){
-        msg.textContent = data.error || 'Save nahi ho saka.';
-        msg.className = 'status-msg err';
-        return;
-      }
-      msg.textContent = 'Past rates save ho gaye (' + data.saved + ' din). Website ka graph update ho gaya.';
-      msg.className = 'status-msg ok';
-      loadHistoryEditor();
-    } catch(err){
-      msg.textContent = 'Network error — dobara koshish karein.';
-      msg.className = 'status-msg err';
-    }
-  }
+  // link for the salesman's daily-rate page
+  (function showSalesLink(){
+    const el = document.getElementById('salesLink');
+    if(el) el.value = location.origin + '/update.html';
+  })();
 
   async function showRateCard(){
     document.getElementById('loginCard').style.display = 'none';
@@ -428,7 +363,6 @@
     syncCalcMaking();
     initInvoiceFields();
     runBillCalc();
-    loadHistoryEditor();
   }
 
   const GRAM_PER_TOLA = 11.664;
