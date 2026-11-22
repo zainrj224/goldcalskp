@@ -76,6 +76,20 @@
     background:transparent;color:var(--red);border:1px solid var(--red);
   }
   .admin-card button.lead-del:hover{background:var(--red);color:#fff;}
+  .rate-datebar{display:flex;justify-content:space-between;align-items:center;background:rgba(212,175,55,.14);
+    border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin:4px 0 6px;}
+  .rate-datebar span{display:block;font-size:11px;color:var(--muted);}
+  .rate-datebar b{font-size:15px;color:var(--text);}
+  .admin-card button.link-btn{width:auto;margin:0;padding:0;background:none;border:none;color:var(--gold-bright);
+    font-size:12px;text-decoration:underline;font-weight:700;}
+  .admin-card button.link-btn:hover{background:none;color:var(--text);}
+  .date-note{font-size:11px;color:var(--muted);margin:6px 0 0;min-height:14px;}
+  .rate-days-title{font-size:12px;font-weight:700;color:var(--text);margin:20px 0 4px;}
+  table.rate-days{width:100%;border-collapse:collapse;font-size:13px;}
+  table.rate-days th{font-size:11px;color:var(--muted);text-align:left;padding:6px 4px;border-bottom:1px solid var(--border);font-weight:700;}
+  table.rate-days td{padding:8px 4px;border-bottom:1px dashed var(--border);color:var(--text);}
+  table.rate-days .num{text-align:right;}
+  table.rate-days tr.sel td{background:rgba(212,175,55,.16);font-weight:800;}
   .vis-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0 6px;}
   .vis-box{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:12px 10px;text-align:center;}
   .vis-box b{display:block;font-size:22px;color:var(--gold-bright);line-height:1.2;}
@@ -150,21 +164,36 @@
 
   <div id="rateCard" style="display:none;">
 
-    <div class="admin-card">
-      <h1>Base Tola Rate</h1>
-      <div class="sub">Yeh rate live board par sab users ko dikhega</div>
-      <div class="current-rate">Current Rate: <b id="currentRateDisp">--</b> PKR / Tola</div>
-      <label for="rateInput">Base Rate — Per Tola 24K (PKR)</label>
-      <input type="number" id="rateInput" placeholder="e.g. 450000">
-    </div>
+    <div class="admin-card" id="dailyRateCard">
+      <h1>Daily Rate</h1>
+      <div class="sub">Rate date ke hisab se save hota hai. Usi date par dobara save karenge to sirf us date ka rate badlega, pichli dates wahi rahengi. Website ka graph khud update ho jata hai.</div>
+      <div class="current-rate">Live Rate: <b id="currentRateDisp">--</b> PKR / Tola (24K)<br>Silver: <b id="currentSilverDisp">--</b> PKR / Tola</div>
 
-    <div class="admin-card">
-      <h1>Silver Rate</h1>
-      <div class="sub">Silver ka rate yahan daalein — live board par silver section dikhega</div>
-      <div class="current-rate">Current Silver Rate: <b id="currentSilverDisp">--</b> PKR / Tola</div>
-      <label for="silverInput">Silver Rate — Per Tola (PKR)</label>
-      <input type="number" id="silverInput" placeholder="e.g. 6500">
-      <small>0 ya khali chhorein to silver section board se hide ho jayega. "Save All Settings" dabane par save hoga.</small>
+      <div class="rate-datebar">
+        <div><span>Rate is date ka lagega</span><b id="rateDateLabel">--</b></div>
+        <button type="button" class="link-btn" onclick="toggleRateDate()">Date badlein</button>
+      </div>
+      <div id="rateDateBox" style="display:none;">
+        <label for="rateDate">Date chunein</label>
+        <input type="date" id="rateDate" onchange="onRateDateChange()">
+      </div>
+      <div class="date-note" id="rateDateNote"></div>
+
+      <label for="rateInput" style="margin-top:14px;">24K Tola Rate (PKR)</label>
+      <input type="number" id="rateInput" placeholder="e.g. 392000">
+
+      <label for="silverInput">Silver Rate — Per Tola (PKR, optional)</label>
+      <input type="number" id="silverInput" placeholder="khali chhorein to pichla silver rate wahi rahega">
+      <small>Silver section board se hide karna ho to 0 likhein.</small>
+
+      <button type="button" onclick="saveDailyRate()">Save Rate</button>
+      <div class="status-msg" id="rateMsg"></div>
+
+      <div class="rate-days-title">Pichle 7 din</div>
+      <table class="rate-days">
+        <thead><tr><th>Date</th><th class="num">24K Tola</th><th class="num">Silver</th></tr></thead>
+        <tbody id="rateDaysBody"></tbody>
+      </table>
     </div>
 
     <div class="admin-card">
@@ -197,14 +226,6 @@
       <hr class="divider">
       <button onclick="saveAll()">Save All Settings</button>
       <div class="status-msg" id="saveMsg"></div>
-    </div>
-
-    <div class="admin-card" id="salesCard">
-      <h1>Salesman Daily Rate Page</h1>
-      <div class="sub">Salesman ko sirf yeh link dein — wo khol kar naya rate daalega, graph khud update ho jayega. Is page par sirf rate update hota hai, baaqi admin cheezein nahi.</div>
-      <label>Link</label>
-      <input type="text" id="salesLink" readonly onclick="this.select()">
-      <small>Ek date par dobara rate daalne se sirf usi date ka rate badalta hai. Alag passcode dena ho to Netlify mein SALESMAN_PASS set karein; warna admin passcode chalta hai.</small>
     </div>
 
     <div class="admin-card" id="billCalcCard">
@@ -318,11 +339,122 @@
     document.getElementById('loginCard').style.display = 'block';
   }
 
-  // link for the salesman's daily-rate page
-  (function showSalesLink(){
-    const el = document.getElementById('salesLink');
-    if(el) el.value = location.origin + '/update.html';
-  })();
+  // ---- Daily Rate (one rate per date) ----
+  const DAILY_API = '/.netlify/functions/daily-rate';
+  let rateToday = '';
+  let rateSelected = '';
+  let liveRate = 0;      // rate shown on the live board right now
+  let liveSilver = 0;
+
+  function numFmt(n){ return n == null ? '--' : Number(n).toLocaleString('en-PK', { maximumFractionDigits: 0 }); }
+
+  function niceRateDate(iso){
+    const d = new Date(iso + 'T00:00:00Z');
+    const s = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+    return iso === rateToday ? 'Aaj — ' + s : s;
+  }
+
+  function renderRateDays(days){
+    document.getElementById('rateDaysBody').innerHTML = (days || []).slice().reverse().map(function(d){
+      return '<tr class="' + (d.date === rateSelected ? 'sel' : '') + '"><td>' + escapeHtml(d.label) + ' ' + d.date.slice(8) + '/' + d.date.slice(5, 7) +
+        '</td><td class="num">' + numFmt(d.rate) + '</td><td class="num">' + (d.silver > 0 ? numFmt(d.silver) : '--') + '</td></tr>';
+    }).join('');
+  }
+
+  function fillRateForm(sel){
+    document.getElementById('rateDateLabel').textContent = niceRateDate(rateSelected);
+    document.getElementById('rateInput').value = sel && sel.rate > 0 ? sel.rate : '';
+    document.getElementById('silverInput').value = sel && sel.silver > 0 ? sel.silver : '';
+    document.getElementById('rateDateNote').textContent = sel && sel.recorded
+      ? 'Is date ka rate pehle se save hai — naya daalenge to badal jayega.'
+      : (sel && sel.rate > 0 ? 'Is date ka rate abhi save nahi hua (pichla rate dikh raha hai).' : 'Is date ka rate abhi save nahi hua.');
+    runBillCalc();
+  }
+
+  async function loadDailyRate(date){
+    const pass = enteredPass || sessionStorage.getItem('gc_admin_entered_pass') || '';
+    try {
+      const res = await fetch(DAILY_API + (date ? '?date=' + encodeURIComponent(date) : ''), { headers: { 'x-admin-pass': pass }, cache: 'no-store' });
+      if(res.status === 401){ backToLogin(); return false; }
+      if(!res.ok) return false;
+      const data = await res.json();
+      rateToday = data.today;
+      rateSelected = data.selected.date;
+      const di = document.getElementById('rateDate');
+      di.max = rateToday;
+      di.value = rateSelected;
+      fillRateForm(data.selected);
+      renderRateDays(data.days);
+      return true;
+    } catch(err){
+      return false;
+    }
+  }
+
+  function toggleRateDate(){
+    const box = document.getElementById('rateDateBox');
+    box.style.display = box.style.display === 'none' ? 'block' : 'none';
+  }
+
+  function onRateDateChange(){
+    const v = document.getElementById('rateDate').value;
+    if(v){ document.getElementById('rateMsg').textContent = ''; loadDailyRate(v); }
+  }
+
+  async function saveDailyRate(){
+    const msg = document.getElementById('rateMsg');
+    const rate = parseFloat(document.getElementById('rateInput').value);
+    const silverRaw = document.getElementById('silverInput').value.trim();
+    if(!isFinite(rate) || rate <= 0){
+      msg.textContent = 'Pehle sahi 24K tola rate daalein.';
+      msg.className = 'status-msg err';
+      return;
+    }
+    const silver = silverRaw === '' ? '' : parseFloat(silverRaw);
+    if(silver !== '' && (!isFinite(silver) || silver < 0)){
+      msg.textContent = 'Sahi silver rate daalein (ya khali chhor dein).';
+      msg.className = 'status-msg err';
+      return;
+    }
+    const pass = enteredPass || sessionStorage.getItem('gc_admin_entered_pass') || '';
+    msg.textContent = 'Save ho raha hai...';
+    msg.className = 'status-msg';
+    try {
+      const res = await fetch(DAILY_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-pass': pass },
+        body: JSON.stringify({ date: rateSelected, rate: rate, silver: silver })
+      });
+      if(res.status === 401){ backToLogin(); return; }
+      const data = await res.json().catch(function(){ return {}; });
+      if(!res.ok){
+        msg.textContent = data.error || 'Save nahi ho saka — dobara koshish karein.';
+        msg.className = 'status-msg err';
+        return;
+      }
+      if(data.live){
+        liveRate = data.rate;
+        liveSilver = data.silver;
+        document.getElementById('currentRateDisp').textContent = fmt(liveRate);
+        document.getElementById('currentSilverDisp').textContent = liveSilver > 0 ? fmt(liveSilver) : 'Not set';
+      }
+      document.getElementById('silverInput').value = data.silver > 0 ? data.silver : '';
+      document.getElementById('rateDateNote').textContent = 'Is date ka rate pehle se save hai — naya daalenge to badal jayega.';
+      renderRateDays(data.days);
+      runBillCalc();
+      msg.textContent = '✔ Save ho gaya — ' + niceRateDate(data.date) + ': ' + numFmt(data.rate) + (data.live ? ' (website par live)' : ' (purani date — live rate nahi badla)');
+      msg.className = 'status-msg ok';
+    } catch(err){
+      msg.textContent = 'Network error — save nahi ho saka.';
+      msg.className = 'status-msg err';
+    }
+  }
+
+  // the calculator / invoice use the rate on screen when editing today, else the live rate
+  function calcBaseRate(){
+    if(rateSelected && rateSelected !== rateToday && liveRate > 0) return liveRate;
+    return parseFloat(document.getElementById('rateInput').value) || liveRate || 0;
+  }
 
   async function showRateCard(){
     document.getElementById('loginCard').style.display = 'none';
@@ -339,12 +471,15 @@
     }
 
     const rate = (settings && isFinite(settings.rate) && settings.rate > 0) ? settings.rate : DEFAULT_TOLA_RATE;
+    liveRate = rate;
     document.getElementById('currentRateDisp').textContent = fmt(rate);
     document.getElementById('rateInput').value = rate;
 
     const silver = (settings && isFinite(settings.silver) && settings.silver > 0) ? settings.silver : 0;
+    liveSilver = silver;
     document.getElementById('currentSilverDisp').textContent = silver > 0 ? fmt(silver) : 'Not set';
     document.getElementById('silverInput').value = silver > 0 ? silver : '';
+    loadDailyRate();
 
     const masha = (settings && isFinite(settings.masha) && settings.masha >= 0) ? settings.masha : DEFAULT_MASHA;
     document.getElementById('mashaInput').value = masha;
@@ -395,7 +530,7 @@
 
   function runBillCalc(){
     const karat = parseInt(document.getElementById('calcKarat').value, 10) || 24;
-    const base = parseFloat(document.getElementById('rateInput').value) || 0;   // 24K base rate from the card above
+    const base = calcBaseRate();   // 24K rate: what is typed in the Daily Rate card (today) or the live rate
     const pT = base * (karat / 24);                                           // tola price for the selected karat
     document.getElementById('calcTolaNote').textContent = pT > 0 ? ('1 Tola ' + karat + 'K price: ' + fmt(pT) + ' PKR') : '1 Tola price: --';
     const M = parseFloat(document.getElementById('calcMasha').value) || 0;
@@ -469,7 +604,7 @@
   async function printInvoice(){
     const msg = document.getElementById('invMsg');
     const karat = parseInt(document.getElementById('calcKarat').value, 10) || 24;
-    const base = parseFloat(document.getElementById('rateInput').value) || 0;
+    const base = calcBaseRate();
     const M = parseFloat(document.getElementById('calcMasha').value) || 0;
     const P = parseFloat(document.getElementById('calcWeight').value) || 0;
     if(!(base > 0) || !(P > 0)){
@@ -520,9 +655,8 @@
   }
 
   async function saveAll(){
-    const rate = parseFloat(document.getElementById('rateInput').value);
-    const silverRaw = document.getElementById('silverInput').value.trim();
-    const silver = silverRaw === '' ? 0 : parseFloat(silverRaw);
+    const rate = liveRate;       // the rate itself is saved in the Daily Rate card above
+    const silver = liveSilver;
     const masha = parseFloat(document.getElementById('mashaInput').value);
     const vol = document.getElementById('volInput').value;
     const live = document.getElementById('liveInput').checked;
@@ -570,8 +704,6 @@
         return;
       }
 
-      document.getElementById('currentRateDisp').textContent = fmt(rate);
-      document.getElementById('currentSilverDisp').textContent = silver > 0 ? fmt(silver) : 'Not set';
       msg.textContent = 'Settings save ho gayi — Live Board update ho jayega.';
       msg.className = 'status-msg ok';
     } catch(err){

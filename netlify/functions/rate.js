@@ -110,15 +110,26 @@ exports.handler = async (event) => {
         updatedAt: Date.now()
       };
 
+      let before = null;
+      try {
+        before = await store.get(KEY, { type: 'json' });
+      } catch (err) {
+        before = null;
+      }
+
       await store.setJSON(KEY, settings);
 
-      // one row per date for the 7-day graph: saving again on the same date replaces that date's row
-      try {
-        const days = await loadDays(store);
-        days[dayKey(settings.updatedAt)] = { rate: settings.rate, silver: settings.silver || 0 };
-        await saveDays(store, days);
-      } catch (err) {
-        console.error('rate history save failed:', err);
+      // one row per date for the 7-day graph. Only when the rate itself changed (not for making/volatility
+      // changes); saving again on the same date replaces that date's row.
+      const rateChanged = !before || before.rate !== settings.rate || (before.silver || 0) !== (settings.silver || 0);
+      if (rateChanged) {
+        try {
+          const days = await loadDays(store);
+          days[dayKey(settings.updatedAt)] = { rate: settings.rate, silver: settings.silver || 0 };
+          await saveDays(store, days);
+        } catch (err) {
+          console.error('rate history save failed:', err);
+        }
       }
 
       return json(200, settings);

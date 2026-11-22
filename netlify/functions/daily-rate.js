@@ -3,7 +3,7 @@ const {
   loadSettings, loadDays, saveDays, seedIfEmpty, latestDate, valueOn, lastDays
 } = require('./lib/rate-days');
 
-// Simple "daily rate" endpoint used by the salesman page (update.html).
+// "Daily rate" endpoint used by the Daily Rate card in the admin panel.
 // One rate per DATE: saving a date replaces that date only. The live board always shows
 // the rate of the most recent date.
 const MAX_BACKDATE_DAYS = 60;
@@ -20,8 +20,7 @@ function isAuthorized(event) {
   const provided = event.headers['x-admin-pass'] || event.headers['X-Admin-Pass'];
   if (!provided) return false;
   const adminPass = process.env.ADMIN_PASS || 'admin123';
-  const salesmanPass = process.env.SALESMAN_PASS || '';   // optional separate passcode for the salesman
-  return provided === adminPass || (salesmanPass !== '' && provided === salesmanPass);
+  return provided === adminPass;
 }
 
 exports.handler = async (event) => {
