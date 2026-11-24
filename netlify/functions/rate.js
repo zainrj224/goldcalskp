@@ -1,5 +1,6 @@
 const { getStore } = require('@netlify/blobs');
 const { dayKey, loadDays, saveDays } = require('./lib/rate-days');
+const { getAutoRate, markRowWritten } = require('./lib/pakgold');
 
 const STORE_NAME = 'gc-admin-settings';
 const KEY = 'settings';
@@ -11,6 +12,7 @@ const DEFAULTS = {
   vol: '200',
   live: true,
   spot: false,
+  autoRate: false,
   updatedAt: 0
 };
 
@@ -54,7 +56,41 @@ exports.handler = async (event) => {
       } catch (err) {
         settings = null;
       }
-      return json(200, settings || DEFAULTS);
+      settings = settings || DEFAULTS;
+
+      // admin panel asks for the stored (manual) settings with ?raw=1
+      const adminPass = process.env.ADMIN_PASS || 'admin123';
+      const providedPass = event.headers['x-admin-pass'] || event.headers['X-Admin-Pass'];
+      const wantsRaw = !!(event.queryStringParameters && event.queryStringParameters.raw) && providedPass === adminPass;
+      if (wantsRaw || !settings.autoRate) {
+        return json(200, settings);
+      }
+
+      // AUTO mode: the website shows the pakgold.net rate; if it is unavailable, the manual rate is used
+      const auto = await getAutoRate(store, { rate: settings.rate, silver: settings.silver });
+      if (auto.rate) {
+        if (auto.rowPending) {
+          // keep the 7-day graph in step: today's row = latest auto rate (written once per new price)
+          try {
+            const days = await loadDays(store);
+            days[dayKey(Date.now())] = { rate: auto.rate, silver: auto.silver > 0 ? auto.silver : (settings.silver || 0) };
+            await saveDays(store, days);
+            await markRowWritten(store, auto.at);
+          } catch (err) {
+            console.error('auto rate history save failed:', err);
+          }
+        }
+        return json(200, Object.assign({}, settings, {
+          rate: auto.rate,
+          silver: auto.silver > 0 ? auto.silver : settings.silver,
+          live: false,                                  // real prices: no simulated flicker
+          updatedAt: Math.max(settings.updatedAt || 0, auto.at),
+          auto: { on: true, source: 'pakgold.net', at: auto.at, fallback: false }
+        }));
+      }
+      return json(200, Object.assign({}, settings, {
+        auto: { on: true, source: 'pakgold.net', at: null, fallback: true, error: auto.error }
+      }));
     }
 
     if (event.httpMethod === 'POST') {
@@ -116,6 +152,8 @@ exports.handler = async (event) => {
       } catch (err) {
         before = null;
       }
+
+      settings.autoRate = !!(before && before.autoRate);   // Save All never switches the source by accident
 
       await store.setJSON(KEY, settings);
 

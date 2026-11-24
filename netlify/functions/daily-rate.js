@@ -99,6 +99,7 @@ exports.handler = async (event) => {
       rate,
       silver,
       live,
+      auto: !!settings.autoRate,
       today,
       days: lastDays(days, 7)
     });

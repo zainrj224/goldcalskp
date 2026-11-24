@@ -17,6 +17,7 @@ const DEFAULT_SETTINGS = {
   vol: '200',
   live: true,
   spot: false,
+  autoRate: false,
   updatedAt: 0
 };
 

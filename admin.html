@@ -76,6 +76,18 @@
     background:transparent;color:var(--red);border:1px solid var(--red);
   }
   .admin-card button.lead-del:hover{background:var(--red);color:#fff;}
+  .src-toggle{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--card2);
+    border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin:12px 0 6px;}
+  .src-toggle b{display:block;font-size:15px;color:var(--text);}
+  .src-toggle span{display:block;font-size:11px;color:var(--muted);margin-top:2px;}
+  .switch{position:relative;display:inline-block;width:52px;height:30px;flex-shrink:0;margin:0 !important;}
+  .switch input{opacity:0;width:0;height:0;}
+  .slider{position:absolute;cursor:pointer;inset:0;background:#8a8f98;border-radius:30px;transition:.2s;}
+  .slider:before{content:"";position:absolute;height:24px;width:24px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;}
+  .switch input:checked + .slider{background:var(--green);}
+  .switch input:checked + .slider:before{transform:translateX(22px);}
+  .auto-banner{font-size:12px;color:var(--text);background:rgba(38,194,129,.14);border:1px solid var(--green);
+    border-radius:10px;padding:10px 12px;margin:10px 0 4px;line-height:1.4;}
   .rate-datebar{display:flex;justify-content:space-between;align-items:center;background:rgba(212,175,55,.14);
     border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin:4px 0 6px;}
   .rate-datebar span{display:block;font-size:11px;color:var(--muted);}
@@ -164,9 +176,25 @@
 
   <div id="rateCard" style="display:none;">
 
+    <div class="admin-card" id="sourceCard">
+      <h1>Live Rate Source</h1>
+      <div class="sub">Website par live rate kahan se aaye: pakgold.net se khud (Auto) ya aapke daale hue rate (Manual).</div>
+      <div class="src-toggle">
+        <div>
+          <b id="srcModeLabel">Manual</b>
+          <span id="srcModeSub">Aapka Daily Rate website par chal raha hai</span>
+        </div>
+        <label class="switch"><input type="checkbox" id="autoToggle" onchange="onAutoToggle()"><span class="slider"></span></label>
+      </div>
+      <div class="date-note" id="autoStatus"></div>
+      <button type="button" onclick="testPakgold()">Test pakgold.net abhi</button>
+      <div class="status-msg" id="autoMsg"></div>
+    </div>
+
     <div class="admin-card" id="dailyRateCard">
       <h1>Daily Rate</h1>
       <div class="sub">Rate date ke hisab se save hota hai. Usi date par dobara save karenge to sirf us date ka rate badlega, pichli dates wahi rahengi. Website ka graph khud update ho jata hai.</div>
+      <div class="auto-banner" id="autoBanner" style="display:none;">Auto mode ON — website par abhi pakgold.net ka rate chal raha hai. Neeche ka rate backup ke taur par save hota hai (auto na chale to wahi use hoga).</div>
       <div class="current-rate">Live Rate: <b id="currentRateDisp">--</b> PKR / Tola (24K)<br>Silver: <b id="currentSilverDisp">--</b> PKR / Tola</div>
 
       <div class="rate-datebar">
@@ -339,6 +367,102 @@
     document.getElementById('loginCard').style.display = 'block';
   }
 
+  // ---- Live rate source: Auto (pakgold.net) / Manual ----
+  const PAKGOLD_API = '/.netlify/functions/pakgold';
+
+  function timeOf(ms){
+    return ms ? new Date(ms).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' }) : '';
+  }
+
+  function showSourceMode(auto, result){
+    document.getElementById('autoToggle').checked = !!auto;
+    document.getElementById('srcModeLabel').textContent = auto ? 'Auto — pakgold.net' : 'Manual';
+    document.getElementById('srcModeSub').textContent = auto
+      ? 'Website par pakgold.net ka rate chal raha hai'
+      : 'Aapka Daily Rate website par chal raha hai';
+    document.getElementById('autoBanner').style.display = auto ? 'block' : 'none';
+    const st = document.getElementById('autoStatus');
+    if(!auto){ st.textContent = ''; return; }
+    if(result && result.rate){
+      st.textContent = 'Abhi: 24K ' + fmt(result.rate) + (result.silver > 0 ? ' · Silver ' + fmt(result.silver) : '') + ' PKR (' + timeOf(result.at) + ')';
+    } else {
+      st.textContent = '⚠ pakgold.net se rate nahi mila' + (result && result.error ? ': ' + result.error : '') + ' — abhi manual rate chal raha hai.';
+    }
+  }
+
+  async function pakgoldCall(method, query, body){
+    const pass = enteredPass || sessionStorage.getItem('gc_admin_entered_pass') || '';
+    const res = await fetch(PAKGOLD_API + (query || ''), {
+      method: method,
+      headers: Object.assign({ 'x-admin-pass': pass }, body ? { 'Content-Type': 'application/json' } : {}),
+      body: body ? JSON.stringify(body) : undefined,
+      cache: 'no-store'
+    });
+    if(res.status === 401){ backToLogin(); return null; }
+    const data = await res.json().catch(function(){ return {}; });
+    return { ok: res.ok, data: data };
+  }
+
+  async function loadAutoStatus(){
+    try {
+      const r = await pakgoldCall('GET', '');
+      if(r && r.ok) showSourceMode(r.data.auto, r.data.result);
+    } catch(err) { /* leave as is */ }
+  }
+
+  async function onAutoToggle(){
+    const msg = document.getElementById('autoMsg');
+    const want = document.getElementById('autoToggle').checked;
+    msg.textContent = want ? 'Auto chalu ho raha hai...' : 'Manual par ja rahe hain...';
+    msg.className = 'status-msg';
+    try {
+      const r = await pakgoldCall('POST', '', { auto: want });
+      if(!r) return;
+      if(!r.ok){
+        document.getElementById('autoToggle').checked = !want;
+        msg.textContent = 'Save nahi ho saka — dobara koshish karein.';
+        msg.className = 'status-msg err';
+        return;
+      }
+      showSourceMode(r.data.auto, r.data.result);
+      if(want && !(r.data.result && r.data.result.rate)){
+        msg.textContent = 'Auto ON hai lekin pakgold.net se rate nahi mila — jab tak mile, manual rate chalega.';
+        msg.className = 'status-msg err';
+      } else {
+        msg.textContent = want ? '✔ Auto ON — website par ab pakgold.net ka rate chal raha hai.' : '✔ Manual ON — website par ab aapka Daily Rate chal raha hai.';
+        msg.className = 'status-msg ok';
+      }
+    } catch(err){
+      document.getElementById('autoToggle').checked = !want;
+      msg.textContent = 'Network error — dobara koshish karein.';
+      msg.className = 'status-msg err';
+    }
+  }
+
+  async function testPakgold(){
+    const msg = document.getElementById('autoMsg');
+    msg.textContent = 'pakgold.net check ho raha hai...';
+    msg.className = 'status-msg';
+    try {
+      const r = await pakgoldCall('GET', '?force=1');
+      if(!r) return;
+      const res = r.data.result || {};
+      if(r.ok && res.rate && !res.error){
+        msg.textContent = '✔ Mil gaya — 24K tola: ' + fmt(res.rate) + (res.silver > 0 ? ' | Silver: ' + fmt(res.silver) : ' | Silver: nahi mila') +
+          (res.pickedFrom ? ' — "' + res.pickedFrom.slice(0, 70) + '…"' : '');
+        msg.className = 'status-msg ok';
+      } else {
+        msg.textContent = '✖ Abhi rate nahi mila' + (res.error ? ': ' + res.error : '') +
+          (res.rate ? ' — pichla rate (' + fmt(res.rate) + ', ' + timeOf(res.at) + ') abhi chal raha hai.' : ' — manual rate chal raha hai.');
+        msg.className = 'status-msg err';
+      }
+      if(r.ok) showSourceMode(r.data.auto, res);
+    } catch(err){
+      msg.textContent = 'Network error — dobara koshish karein.';
+      msg.className = 'status-msg err';
+    }
+  }
+
   // ---- Daily Rate (one rate per date) ----
   const DAILY_API = '/.netlify/functions/daily-rate';
   let rateToday = '';
@@ -442,7 +566,8 @@
       document.getElementById('rateDateNote').textContent = 'Is date ka rate pehle se save hai — naya daalenge to badal jayega.';
       renderRateDays(data.days);
       runBillCalc();
-      msg.textContent = '✔ Save ho gaya — ' + niceRateDate(data.date) + ': ' + numFmt(data.rate) + (data.live ? ' (website par live)' : ' (purani date — live rate nahi badla)');
+      msg.textContent = '✔ Save ho gaya — ' + niceRateDate(data.date) + ': ' + numFmt(data.rate) +
+        (data.auto ? ' (backup rate — abhi Auto mode ON hai)' : (data.live ? ' (website par live)' : ' (purani date — live rate nahi badla)'));
       msg.className = 'status-msg ok';
     } catch(err){
       msg.textContent = 'Network error — save nahi ho saka.';
@@ -462,7 +587,8 @@
 
     let settings = null;
     try {
-      const res = await fetch(RATE_API);
+      const adminPassNow = enteredPass || sessionStorage.getItem('gc_admin_entered_pass') || '';
+      const res = await fetch(RATE_API + '?raw=1', { headers: { 'x-admin-pass': adminPassNow }, cache: 'no-store' });
       if(res.ok){
         settings = await res.json();
       }
@@ -480,6 +606,7 @@
     document.getElementById('currentSilverDisp').textContent = silver > 0 ? fmt(silver) : 'Not set';
     document.getElementById('silverInput').value = silver > 0 ? silver : '';
     loadDailyRate();
+    loadAutoStatus();
 
     const masha = (settings && isFinite(settings.masha) && settings.masha >= 0) ? settings.masha : DEFAULT_MASHA;
     document.getElementById('mashaInput').value = masha;

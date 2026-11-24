@@ -201,6 +201,7 @@
   /* 7-day rate graph */
   .home-branch-card .hb-chart{flex:1 1 280px;min-width:240px;display:flex;flex-direction:column;justify-content:center;}
   .hb-chart-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:2px;flex-wrap:wrap;}
+  .home-branch-card .hb-source{font-size:10px;color:var(--muted);margin-top:8px;}
   .hb-chart-title{font-size:14px;font-weight:800;color:var(--gold-bright);}
   .hb-chart-change{font-size:13px;font-weight:700;margin-top:2px;color:var(--muted);}
   .hb-chart-change.up{color:var(--green);}
@@ -602,6 +603,7 @@
     <h3>Rajput Jewelers — Sheikhupura</h3>
     <div class="hb-sub">Timeless Artistry · Gold &amp; Jewelry Showroom</div>
     <a class="hb-call" href="tel:03098092475">📞 Call: 0309-8092475</a>
+    <div class="hb-source" id="hbSource"></div>
   </div>
   <div class="hb-chart" id="hbChart">
     <div class="hb-chart-head">
@@ -1308,6 +1310,18 @@ function applyAdminSettings(settings){
 
   const live = settings ? settings.live : null;
   document.getElementById('liveToggle').checked = (live === null || live === undefined) ? (DEFAULT_LIVE === '1') : !!live;
+
+  // AUTO mode: say where the rates come from
+  const src = document.getElementById('hbSource');
+  if(src){
+    const a = settings && settings.auto;
+    if(a && a.on && !a.fallback && a.at){
+      const t = new Date(a.at).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' });
+      src.textContent = 'Rates auto-updated from ' + a.source + ' · ' + t;
+    } else {
+      src.textContent = '';
+    }
+  }
 }
 
 async function loadAdminSettings(){
