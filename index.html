@@ -209,6 +209,11 @@
   .hb-chart-tabs{display:flex;gap:6px;}
   .hb-chart-tab{border:1px solid var(--border);background:transparent;color:var(--muted);font-size:11px;font-weight:700;padding:3px 11px;border-radius:20px;cursor:pointer;}
   .hb-chart-tab.active{background:var(--gold);border-color:var(--gold);color:#141416;}
+  .hb-chart-ranges{display:flex;justify-content:center;gap:6px;margin-top:6px;}
+  .hb-chart-range{border:1px solid var(--border);background:transparent;color:var(--muted);font-size:11px;font-weight:700;padding:4px 14px;border-radius:20px;cursor:pointer;}
+  .hb-chart-range.active{background:var(--gold);border-color:var(--gold);color:#141416;}
+  .hb-chart .c-tick{stroke:var(--border);stroke-width:1;}
+  .hb-chart .c-tiptime{font-size:10px;font-weight:700;fill:#141416;opacity:.75;text-anchor:middle;}
   .hb-chart #hbChartBody{touch-action:pan-y;cursor:pointer;}
   .hb-chart svg{width:100%;height:auto;display:block;overflow:visible;}
   .hb-chart .c-line{fill:none;stroke-width:3;stroke-linejoin:round;stroke-linecap:round;}
@@ -617,6 +622,12 @@
       </div>
     </div>
     <div id="hbChartBody"></div>
+    <div class="hb-chart-ranges" id="hbChartRanges">
+      <button type="button" class="hb-chart-range active" data-range="7d">7D</button>
+      <button type="button" class="hb-chart-range" data-range="3d">3D</button>
+      <button type="button" class="hb-chart-range" data-range="24h">24H</button>
+      <button type="button" class="hb-chart-range" data-range="1h">1H</button>
+    </div>
     <div class="hb-chart-note" id="hbChartNote"></div>
   </div>
   <div class="hb-right">
@@ -965,15 +976,20 @@ function updateBill(){
 }
 
 
-// ---- 7-day rate graph (hero card) ----
-let rateHistory = null;
+// ---- rate graph (hero card): 7D / 3D / 24H / 1H, continuous time axis ----
+let rateHistory = null;     // { range, now, points:[{t,r,s}], days }
 let chartMode = 'gold';
-let chartActive = null;   // day index shown in the tooltip (null = latest day)
+let chartRange = '7d';
+let chartActiveT = null;    // timestamp of the point under the pointer (null = latest)
 let chartGeom = null;
+let chartHover = false;
+const CHART_RANGE_MS = { '7d': 7 * 864e5, '3d': 3 * 864e5, '24h': 864e5, '1h': 36e5 };
+const CHART_RANGE_TITLE = { '7d': 'Last 7 days', '3d': 'Last 3 days', '24h': 'Last 24 hours', '1h': 'Last 1 hour' };
+const PK_TZ = 'Asia/Karachi';
 
 async function loadRateHistory(){
   try {
-    const res = await fetch('/.netlify/functions/history', { cache: 'no-store' });
+    const res = await fetch('/.netlify/functions/history?range=' + chartRange, { cache: 'no-store' });
     if(!res.ok) return;
     rateHistory = await res.json();
     renderRateChart();
@@ -982,42 +998,89 @@ async function loadRateHistory(){
   }
 }
 
+function pkTime(t){
+  return new Date(t).toLocaleTimeString('en-PK', { hour: 'numeric', minute: '2-digit', timeZone: PK_TZ });
+}
+function pkDay(t){
+  return new Date(t).toLocaleDateString('en-GB', { weekday: 'short', timeZone: PK_TZ });
+}
+function pkHour(t){
+  return new Date(t).toLocaleTimeString('en-PK', { hour: 'numeric', timeZone: PK_TZ });
+}
+
+// tick positions aligned to Pakistan time
+function chartTicks(start, end, range){
+  const PK = 5 * 36e5;
+  const step = { '7d': 864e5, '3d': 432e5, '24h': 144e5, '1h': 6e5 }[range];
+  const out = [];
+  for(let t = Math.ceil((start + PK) / step) * step - PK; t <= end; t += step) out.push(t);
+  return out;
+}
+function tickLabel(t, range){
+  if(range === '7d') return pkDay(t);
+  if(range === '3d') return (((t + 5 * 36e5) % 864e5) === 0) ? pkDay(t) : pkHour(t);
+  if(range === '24h') return pkHour(t);
+  return pkTime(t).replace(/\s?(am|pm)/i, '').trim();
+}
+function pointTimeLabel(t, range, isNow){
+  if(isNow) return 'Now';
+  return (range === '7d' || range === '3d' ? pkDay(t) + ' ' : '') + pkTime(t);
+}
+function dataSpanText(ms){
+  const m = Math.round(ms / 60000);
+  if(m < 60) return m + ' min';
+  const h = Math.floor(m / 60);
+  if(h < 48) return h + 'h ' + (m % 60) + 'm';
+  return Math.round(h / 24) + ' din';
+}
+
 function renderRateChart(){
   const body = document.getElementById('hbChartBody');
   if(!body) return;
+  const hist = (rateHistory && Array.isArray(rateHistory.points)) ? rateHistory.points : [];
   const days = (rateHistory && Array.isArray(rateHistory.days)) ? rateHistory.days : [];
 
-  // Silver tab only when a silver rate has been set
-  const hasSilver = days.some(d => d.silver > 0);
+  // Silver tab only when a silver rate exists
+  const hasSilver = days.some(d => d.silver > 0) || getSilverBase() > 0;
   if(!hasSilver) chartMode = 'gold';
   const silverTab = document.querySelector('.hb-chart-tab[data-mode="silver"]');
   if(silverTab) silverTab.style.display = hasSilver ? '' : 'none';
   document.querySelectorAll('.hb-chart-tab').forEach(function(t){
     t.classList.toggle('active', t.dataset.mode === chartMode);
   });
-  document.getElementById('hbChartTitle').textContent =
-    chartMode === 'silver' ? 'Silver (Tola) · Last 7 days' : '24K Gold (Tola) · Last 7 days';
-
-  const pts = days.map(function(d){
-    const v = chartMode === 'silver' ? d.silver : d.rate;
-    return { label: d.label, v: v > 0 ? v : null };
+  document.querySelectorAll('.hb-chart-range').forEach(function(t){
+    t.classList.toggle('active', t.dataset.range === chartRange);
   });
-  const vals = pts.filter(p => p.v != null).map(p => p.v);
+  document.getElementById('hbChartTitle').textContent =
+    (chartMode === 'silver' ? 'Silver (Tola) · ' : '24K Gold (Tola) · ') + CHART_RANGE_TITLE[chartRange];
+
+  const end = Date.now();
+  const span = CHART_RANGE_MS[chartRange];
+  const start = end - span;
+
+  // series for the selected metal: recorded points + the live price at "now"
+  const key = chartMode === 'silver' ? 's' : 'r';
+  let pts = hist.filter(p => p[key] > 0 && p.t <= end).map(p => ({ t: Math.max(p.t, start), v: p[key], now: false }));
+  const live = chartMode === 'silver' ? getSilverBase() : getBase();
+  if(live > 0) pts.push({ t: end, v: live, now: true });
+  pts.sort((a, b) => a.t - b.t);
+
   const changeEl = document.getElementById('hbChartChange');
   const noteEl = document.getElementById('hbChartNote');
-
-  if(vals.length === 0){
-    body.innerHTML = '';
+  const body0 = body;
+  if(pts.length === 0){
+    body0.innerHTML = '';
     changeEl.textContent = '';
     changeEl.className = 'hb-chart-change';
     noteEl.textContent = 'Graph ke liye abhi data nahi hai.';
+    chartGeom = null;
     return;
   }
 
-  // change between the first and last day we have data for
-  if(vals.length >= 2){
-    const diff = vals[vals.length - 1] - vals[0];
-    const pct = vals[0] ? (diff / vals[0]) * 100 : 0;
+  const first = pts[0], last = pts[pts.length - 1];
+  if(pts.length >= 2){
+    const diff = last.v - first.v;
+    const pct = first.v ? (diff / first.v) * 100 : 0;
     if(Math.round(diff) === 0){
       changeEl.className = 'hb-chart-change';
       changeEl.textContent = '— No change';
@@ -1030,12 +1093,13 @@ function renderRateChart(){
     changeEl.className = 'hb-chart-change';
     changeEl.textContent = '';
   }
-  noteEl.textContent = vals.length < 7
-    ? ('Abhi ' + vals.length + '/7 din ka data hai — har din naya rate jama hota hai.')
+  noteEl.textContent = (first.t - start > span * 0.1)
+    ? ('Is range ka data abhi sirf ' + dataSpanText(end - first.t) + ' ka hai — waqt ke saath graph bharta jayega.')
     : '';
 
-  // ---- draw the line chart (inline SVG): smooth curve, gradient line + fill, tooltip on the active day ----
-  const W = Math.max(240, Math.round(body.clientWidth || 420)), H = 170, padL = 14, padR = 14, padT = 40, padB = 26;
+  // ---- geometry ----
+  const W = Math.max(240, Math.round(body.clientWidth || 420)), H = 190, padL = 14, padR = 14, padT = 48, padB = 26;
+  const vals = pts.map(p => p.v);
   let min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
   if(min === max){
     const pad = (min * 0.01) || 1;
@@ -1044,34 +1108,47 @@ function renderRateChart(){
     const pad = (max - min) * 0.25;
     min -= pad; max += pad;
   }
-  const n = pts.length;
-  const slot = (W - padL - padR) / n;
-  const X = i => padL + (i + 0.5) * slot;
+  const X = t => padL + ((t - start) / span) * (W - padL - padR);
   const Y = v => padT + (1 - (v - min) / (max - min)) * (H - padT - padB);
   const base = H - padB;
 
-  const have = pts.map((p, i) => p.v != null ? { x: X(i), y: Y(p.v), v: p.v, i: i } : null).filter(Boolean);
-  const last = have[have.length - 1];
-  const active = have.filter(q => q.i === chartActive)[0] || last;
+  // one point per pixel column (the curve needs strictly increasing x)
+  const have = [];
+  pts.forEach(function(p){
+    const q = { x: X(p.t), y: Y(p.v), v: p.v, t: p.t, now: p.now };
+    if(have.length && q.x - have[have.length - 1].x < 0.5) have[have.length - 1] = q; else have.push(q);
+  });
+  const lastQ = have[have.length - 1];
+  const active = have.filter(q => q.t === chartActiveT)[0] || lastQ;
   chartGeom = { W: W, have: have };
 
-  let line = '';
-  if(have.length > 1) line = smoothPath(have);
-  const area = line ? (line + ' L' + last.x.toFixed(1) + ' ' + base + ' L' + have[0].x.toFixed(1) + ' ' + base + ' Z') : '';
+  const line = have.length > 1 ? smoothPath(have) : '';
+  const area = line ? (line + ' L' + lastQ.x.toFixed(1) + ' ' + base + ' L' + have[0].x.toFixed(1) + ' ' + base + ' Z') : '';
 
-  let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="7 day rate graph">' +
+  let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="rate graph">' +
     '<defs>' +
     '<linearGradient id="hbLineGrad" x1="0" y1="0" x2="1" y2="0">' +
     '<stop offset="0%" style="stop-color:var(--gold)"/><stop offset="100%" style="stop-color:var(--gold-bright)"/></linearGradient>' +
     '<linearGradient id="hbAreaGrad" x1="0" y1="0" x2="0" y2="1">' +
     '<stop offset="0%" style="stop-color:var(--gold-bright);stop-opacity:.38"/>' +
     '<stop offset="100%" style="stop-color:var(--gold-bright);stop-opacity:0"/></linearGradient></defs>';
+
+  // time axis ticks
+  let ticks = chartTicks(start, end, chartRange);
+  if(ticks.length > 8){ const k = Math.ceil(ticks.length / 8); ticks = ticks.filter((_, i) => i % k === 0); }
+  ticks.forEach(function(t){
+    const x = X(t);
+    if(x < padL - 1 || x > W - padR + 1) return;
+    svg += '<line class="c-tick" x1="' + x.toFixed(1) + '" y1="' + base + '" x2="' + x.toFixed(1) + '" y2="' + (base + 4) + '"/>';
+    svg += '<text class="c-day" x="' + x.toFixed(1) + '" y="' + (H - 6) + '">' + tickLabel(t, chartRange) + '</text>';
+  });
+
   if(area) svg += '<path d="' + area + '" fill="url(#hbAreaGrad)"/>';
   if(line) svg += '<path class="c-line" d="' + line + '" stroke="url(#hbLineGrad)"/>';
 
-  // tooltip: dashed line, dot and value pill on the active day
+  // tooltip on the active point: value + time
   const label = fmt(active.v);
-  const tw = label.length * 7.6 + 22, th = 24;
+  const tw = Math.max(label.length * 7.6 + 22, 70), th = 36;
   let tx = active.x - tw / 2;
   tx = Math.max(2, Math.min(W - tw - 2, tx));
   const ty = Math.max(2, active.y - th - 12);
@@ -1079,12 +1156,7 @@ function renderRateChart(){
   svg += '<circle class="c-tipdot" cx="' + active.x.toFixed(1) + '" cy="' + active.y.toFixed(1) + '" r="5"/>';
   svg += '<rect class="c-tipbg" x="' + tx.toFixed(1) + '" y="' + ty.toFixed(1) + '" width="' + tw.toFixed(1) + '" height="' + th + '" rx="8"/>';
   svg += '<text class="c-tiptext" x="' + (tx + tw / 2).toFixed(1) + '" y="' + (ty + 16).toFixed(1) + '">' + label + '</text>';
-
-  pts.forEach(function(p, i){
-    const isActive = i === active.i;
-    const text = (i === n - 1) ? 'Today' : p.label;
-    svg += '<text class="c-day' + (isActive ? ' active' : '') + '" x="' + X(i).toFixed(1) + '" y="' + (H - 6) + '">' + text + '</text>';
-  });
+  svg += '<text class="c-tiptime" x="' + (tx + tw / 2).toFixed(1) + '" y="' + (ty + 29).toFixed(1) + '">' + pointTimeLabel(active.t, chartRange, active.now) + '</text>';
   svg += '</svg>';
   body.innerHTML = svg;
 }
@@ -1121,11 +1193,12 @@ function smoothPath(p){
   return d;
 }
 
-// touch / hover: move the tooltip to the day under the finger or mouse
+// touch / hover: move the tooltip to the point under the finger or mouse
 (function wireChartPointer(){
   const body = document.getElementById('hbChartBody');
   if(!body) return;
   function pick(e){
+    chartHover = true;
     if(!chartGeom) return;
     const svg = body.querySelector('svg');
     if(!svg) return;
@@ -1136,23 +1209,29 @@ function smoothPath(p){
       const d = Math.abs(q.x - x);
       if(d < bd){ bd = d; best = q; }
     });
-    if(best && best.i !== chartActive){ chartActive = best.i; renderRateChart(); }
+    if(best && best.t !== chartActiveT){ chartActiveT = best.t; renderRateChart(); }
   }
   body.addEventListener('pointermove', pick);
   body.addEventListener('pointerdown', pick);
   body.addEventListener('pointerleave', function(){
-    if(chartActive !== null){ chartActive = null; renderRateChart(); }
+    chartHover = false;
+    if(chartActiveT !== null){ chartActiveT = null; renderRateChart(); }
   });
 })();
 
 document.querySelectorAll('.hb-chart-tab').forEach(function(t){
-  t.addEventListener('click', function(){ chartMode = t.dataset.mode; chartActive = null; renderRateChart(); });
+  t.addEventListener('click', function(){ chartMode = t.dataset.mode; chartActiveT = null; renderRateChart(); });
+});
+document.querySelectorAll('.hb-chart-range').forEach(function(t){
+  t.addEventListener('click', function(){ chartRange = t.dataset.range; chartActiveT = null; loadRateHistory(); renderRateChart(); });
 });
 let chartResizeTimer = null;
 window.addEventListener('resize', function(){
   clearTimeout(chartResizeTimer);
   chartResizeTimer = setTimeout(renderRateChart, 150);
 });
+// time keeps moving: redraw every few seconds so the right edge is always "now"
+setInterval(function(){ if(!chartHover && !document.hidden) renderRateChart(); }, 5000);
 
 function updateHomeBranch(){
   const val = cityState['Sheikhupura'] || 0;
@@ -1311,13 +1390,15 @@ function applyAdminSettings(settings){
   const live = settings ? settings.live : null;
   document.getElementById('liveToggle').checked = (live === null || live === undefined) ? (DEFAULT_LIVE === '1') : !!live;
 
+  autoModeOn = !!(settings && settings.auto && settings.auto.on);
+
   // AUTO mode: say where the rates come from
   const src = document.getElementById('hbSource');
   if(src){
     const a = settings && settings.auto;
     if(a && a.on && !a.fallback && a.at){
       const t = new Date(a.at).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' });
-      src.textContent = 'Rates auto-updated from ' + a.source + ' · ' + t;
+      src.textContent = 'Rates live from ' + a.source + ' · last change ' + t;
     } else {
       src.textContent = '';
     }
@@ -1343,7 +1424,14 @@ async function loadAdminSettings(){
 }
 
 // poll the shared endpoint so all visitors pick up admin changes live
+let autoModeOn = false;     // true while the admin has Auto (pakgold.net) switched on
+let polling = false;
+let lastPollAt = 0;
+
 async function pollAdminSettings(){
+  if(polling) return;
+  polling = true;
+  lastPollAt = Date.now();
   try {
     const res = await fetch(RATE_API, { cache: 'no-store' });
     if(!res.ok) return;
@@ -1359,10 +1447,19 @@ async function pollAdminSettings(){
     }
   } catch(err){
     // network error — try again on the next poll
+  } finally {
+    polling = false;
   }
 }
-setInterval(pollAdminSettings, 10000);
-setInterval(loadRateHistory, 300000);
+
+// Auto mode: look every 1 second (hidden tabs pause). Manual mode: every 10 seconds, as before.
+setInterval(function(){
+  if(document.hidden) return;
+  if(!autoModeOn && Date.now() - lastPollAt < 10000) return;
+  pollAdminSettings();
+}, 1000);
+document.addEventListener('visibilitychange', function(){ if(!document.hidden) pollAdminSettings(); });
+setInterval(loadRateHistory, 60000);
 
 // init
 applyTheme('light');

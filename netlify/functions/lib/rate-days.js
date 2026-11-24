@@ -132,7 +132,68 @@ function lastDays(days, n) {
   return out;
 }
 
+// ---------- timestamped price points (for the graph's 7D / 3D / 24H / 1H views) ----------
+const POINTS_KEY = 'rate-points';          // [[timestampMs, rate, silver], ...] one entry per price CHANGE
+const POINTS_KEEP_MS = 8 * 86400000;
+const POINTS_MAX = 8000;
+
+async function loadPoints(store) {
+  let p = null;
+  try {
+    p = await store.get(POINTS_KEY, { type: 'json' });
+  } catch (err) {
+    p = null;
+  }
+  return Array.isArray(p) ? p : [];
+}
+
+// remember that the live price became (rate, silver) at time t; same price twice in a row is ignored
+async function appendPoint(store, rate, silver, t) {
+  if (!(rate > 0)) return;
+  const when = t || Date.now();
+  let pts = await loadPoints(store);
+  const last = pts[pts.length - 1];
+  if (last && last[1] === rate && (last[2] || 0) === (silver || 0)) return;
+  pts.push([when, rate, silver || 0]);
+  const cutoff = Date.now() - POINTS_KEEP_MS;
+  pts = pts.filter((p) => p[0] >= cutoff).slice(-POINTS_MAX);
+  await store.setJSON(POINTS_KEY, pts);
+}
+
+const RANGES = { '7d': 7 * 86400000, '3d': 3 * 86400000, '24h': 86400000, '1h': 3600000 };
+
+// points for one graph window: starts with the price that was already live at the window start,
+// then every change inside the window (thinned to maxN points for long windows)
+function windowPoints(points, days, rangeKey, now, maxN) {
+  const span = RANGES[rangeKey] || RANGES['7d'];
+  const start = now - span;
+  let src = points.map((p) => ({ t: p[0], r: p[1], s: p[2] || 0 }));
+  const firstT = src.length ? src[0].t : Infinity;
+  // before the point log began, use the per-date rows (as noon of that day)
+  Object.keys(days).sort().forEach((d) => {
+    const t = Date.parse(d + 'T12:00:00Z') - PKT_OFFSET_MS;
+    if (t < firstT && days[d] && days[d].rate > 0) src.push({ t, r: days[d].rate, s: days[d].silver || 0 });
+  });
+  src.sort((a, b) => a.t - b.t);
+
+  let startVal = null;
+  src.forEach((p) => { if (p.t <= start) startVal = p; });
+  let inWin = src.filter((p) => p.t > start && p.t <= now);
+
+  const limit = maxN || 300;
+  if (inWin.length > limit) {
+    const bucket = span / limit;
+    const byBucket = new Map();
+    inWin.forEach((p) => { byBucket.set(Math.floor((p.t - start) / bucket), p); });   // last price of each bucket
+    inWin = Array.from(byBucket.values());
+  }
+  const out = [];
+  if (startVal) out.push({ t: start, r: startVal.r, s: startVal.s });
+  return out.concat(inWin);
+}
+
 module.exports = {
   DEFAULT_SETTINGS, SETTINGS_KEY, getBlobsStore, dayKey, todayKey, isDateKey,
-  loadSettings, loadDays, saveDays, seedIfEmpty, latestDate, valueOn, lastDays
+  loadSettings, loadDays, saveDays, seedIfEmpty, latestDate, valueOn, lastDays,
+  loadPoints, appendPoint, windowPoints, RANGES
 };

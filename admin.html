@@ -187,7 +187,13 @@
         <label class="switch"><input type="checkbox" id="autoToggle" onchange="onAutoToggle()"><span class="slider"></span></label>
       </div>
       <div class="date-note" id="autoStatus"></div>
-      <button type="button" onclick="testPakgold()">Test pakgold.net abhi</button>
+
+      <label for="autoUrl" style="margin-top:14px;">Exact data link <small>(optional — sab se sahi sync)</small></label>
+      <input type="text" id="autoUrl" placeholder="https://… (khali = pakgold.net ka main page)" autocomplete="off">
+      <small>pakgold.net kholen → F12 → Network → Fetch/XHR → jis request mein rate (jaise 387,862) dikhe, uska link yahan paste karein.</small>
+      <button type="button" onclick="saveAutoUrl()">Save Link</button>
+
+      <button type="button" onclick="testPakgold()" style="margin-top:10px;">Test pakgold.net abhi</button>
       <div class="status-msg" id="autoMsg"></div>
     </div>
 
@@ -374,8 +380,10 @@
     return ms ? new Date(ms).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' }) : '';
   }
 
-  function showSourceMode(auto, result){
+  function showSourceMode(auto, result, url){
     document.getElementById('autoToggle').checked = !!auto;
+    const urlBox = document.getElementById('autoUrl');
+    if(urlBox && url !== undefined && document.activeElement !== urlBox) urlBox.value = url || '';
     document.getElementById('srcModeLabel').textContent = auto ? 'Auto — pakgold.net' : 'Manual';
     document.getElementById('srcModeSub').textContent = auto
       ? 'Website par pakgold.net ka rate chal raha hai'
@@ -406,7 +414,7 @@
   async function loadAutoStatus(){
     try {
       const r = await pakgoldCall('GET', '');
-      if(r && r.ok) showSourceMode(r.data.auto, r.data.result);
+      if(r && r.ok) showSourceMode(r.data.auto, r.data.result, r.data.url);
     } catch(err) { /* leave as is */ }
   }
 
@@ -424,7 +432,7 @@
         msg.className = 'status-msg err';
         return;
       }
-      showSourceMode(r.data.auto, r.data.result);
+      showSourceMode(r.data.auto, r.data.result, r.data.url);
       if(want && !(r.data.result && r.data.result.rate)){
         msg.textContent = 'Auto ON hai lekin pakgold.net se rate nahi mila — jab tak mile, manual rate chalega.';
         msg.className = 'status-msg err';
@@ -449,14 +457,46 @@
       const res = r.data.result || {};
       if(r.ok && res.rate && !res.error){
         msg.textContent = '✔ Mil gaya — 24K tola: ' + fmt(res.rate) + (res.silver > 0 ? ' | Silver: ' + fmt(res.silver) : ' | Silver: nahi mila') +
-          (res.pickedFrom ? ' — "' + res.pickedFrom.slice(0, 70) + '…"' : '');
+          (res.headline ? ' (pakgold ki headline se)' : '') +
+          (res.candidates && res.candidates.length ? ' | Page par mile numbers: ' + res.candidates.slice(0, 5).join(', ') : '');
         msg.className = 'status-msg ok';
       } else {
         msg.textContent = '✖ Abhi rate nahi mila' + (res.error ? ': ' + res.error : '') +
           (res.rate ? ' — pichla rate (' + fmt(res.rate) + ', ' + timeOf(res.at) + ') abhi chal raha hai.' : ' — manual rate chal raha hai.');
         msg.className = 'status-msg err';
       }
-      if(r.ok) showSourceMode(r.data.auto, res);
+      if(r.ok) showSourceMode(r.data.auto, res, r.data.url);
+    } catch(err){
+      msg.textContent = 'Network error — dobara koshish karein.';
+      msg.className = 'status-msg err';
+    }
+  }
+
+  async function saveAutoUrl(){
+    const msg = document.getElementById('autoMsg');
+    const url = document.getElementById('autoUrl').value.trim();
+    msg.textContent = 'Link save ho raha hai...';
+    msg.className = 'status-msg';
+    try {
+      const r = await pakgoldCall('POST', '', { url: url });
+      if(!r) return;
+      if(!r.ok){
+        msg.textContent = r.data.error || 'Save nahi ho saka.';
+        msg.className = 'status-msg err';
+        return;
+      }
+      showSourceMode(r.data.auto, r.data.result, r.data.url);
+      const res = r.data.result;
+      if(!r.data.auto){
+        msg.textContent = '✔ Link save ho gaya (Auto abhi OFF hai — chalane ke liye upar switch ON karein).';
+        msg.className = 'status-msg ok';
+      } else if(res && res.rate && !res.error){
+        msg.textContent = '✔ Link save — is link se rate mila: ' + fmt(res.rate) + (res.silver > 0 ? ' | Silver: ' + fmt(res.silver) : '');
+        msg.className = 'status-msg ok';
+      } else {
+        msg.textContent = '✖ Link save ho gaya lekin is se rate nahi mila' + (res && res.error ? ': ' + res.error : '') + ' — manual/purana rate chal raha hai.';
+        msg.className = 'status-msg err';
+      }
     } catch(err){
       msg.textContent = 'Network error — dobara koshish karein.';
       msg.className = 'status-msg err';

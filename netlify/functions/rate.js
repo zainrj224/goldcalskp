@@ -1,5 +1,5 @@
 const { getStore } = require('@netlify/blobs');
-const { dayKey, loadDays, saveDays } = require('./lib/rate-days');
+const { dayKey, loadDays, saveDays, appendPoint } = require('./lib/rate-days');
 const { getAutoRate, markRowWritten } = require('./lib/pakgold');
 
 const STORE_NAME = 'gc-admin-settings';
@@ -13,6 +13,7 @@ const DEFAULTS = {
   live: true,
   spot: false,
   autoRate: false,
+  autoUrl: '',
   updatedAt: 0
 };
 
@@ -67,7 +68,7 @@ exports.handler = async (event) => {
       }
 
       // AUTO mode: the website shows the pakgold.net rate; if it is unavailable, the manual rate is used
-      const auto = await getAutoRate(store, { rate: settings.rate, silver: settings.silver });
+      const auto = await getAutoRate(store, { rate: settings.rate, silver: settings.silver, url: settings.autoUrl });
       if (auto.rate) {
         if (auto.rowPending) {
           // keep the 7-day graph in step: today's row = latest auto rate (written once per new price)
@@ -75,7 +76,8 @@ exports.handler = async (event) => {
             const days = await loadDays(store);
             days[dayKey(Date.now())] = { rate: auto.rate, silver: auto.silver > 0 ? auto.silver : (settings.silver || 0) };
             await saveDays(store, days);
-            await markRowWritten(store, auto.at);
+            await appendPoint(store, auto.rate, auto.silver > 0 ? auto.silver : (settings.silver || 0), auto.changedAt);
+            await markRowWritten(store, auto.changedAt);
           } catch (err) {
             console.error('auto rate history save failed:', err);
           }
@@ -84,8 +86,8 @@ exports.handler = async (event) => {
           rate: auto.rate,
           silver: auto.silver > 0 ? auto.silver : settings.silver,
           live: false,                                  // real prices: no simulated flicker
-          updatedAt: Math.max(settings.updatedAt || 0, auto.at),
-          auto: { on: true, source: 'pakgold.net', at: auto.at, fallback: false }
+          updatedAt: Math.max(settings.updatedAt || 0, auto.changedAt || 0),   // changes only when the price changes
+          auto: { on: true, source: 'pakgold.net', at: auto.changedAt, checkedAt: auto.at, fallback: false }
         }));
       }
       return json(200, Object.assign({}, settings, {
@@ -154,6 +156,7 @@ exports.handler = async (event) => {
       }
 
       settings.autoRate = !!(before && before.autoRate);   // Save All never switches the source by accident
+      settings.autoUrl = (before && before.autoUrl) || '';
 
       await store.setJSON(KEY, settings);
 
@@ -165,6 +168,7 @@ exports.handler = async (event) => {
           const days = await loadDays(store);
           days[dayKey(settings.updatedAt)] = { rate: settings.rate, silver: settings.silver || 0 };
           await saveDays(store, days);
+          if (!settings.autoRate) await appendPoint(store, settings.rate, settings.silver || 0, settings.updatedAt);
         } catch (err) {
           console.error('rate history save failed:', err);
         }

@@ -1,6 +1,6 @@
 const {
   DEFAULT_SETTINGS, SETTINGS_KEY, getBlobsStore, dayKey, todayKey, isDateKey,
-  loadSettings, loadDays, saveDays, seedIfEmpty, latestDate, valueOn, lastDays
+  loadSettings, loadDays, saveDays, seedIfEmpty, latestDate, valueOn, lastDays, appendPoint
 } = require('./lib/rate-days');
 
 // "Daily rate" endpoint used by the Daily Rate card in the admin panel.
@@ -91,6 +91,7 @@ exports.handler = async (event) => {
       const next = Object.assign({}, settings, { rate, silver, updatedAt: Date.now() });
       await store.setJSON(SETTINGS_KEY, next);
       live = true;
+      if (!settings.autoRate) await appendPoint(store, rate, silver, Date.now());   // graph point (manual mode)
     }
 
     return json(200, {
